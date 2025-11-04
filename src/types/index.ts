@@ -225,11 +225,11 @@ export interface Project {
 
 // ===== FACADE INSPECTION SYSTEM =====
 
-export type FacadeSideType = 'NORTH' | 'SOUTH' | 'EAST' | 'WEST' | 'ROOF' | 'OTHER';
+export type FacadeSideType = 'front' | 'back' | 'left' | 'right' | 'internal';
 
-export type InspectionStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
+export type InspectionStatus = 'scheduled' | 'in_progress' | 'completed' | 'approved' | 'rejected' | 'archived';
 
-export type PathologySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type PathologySeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface FacadeInspection {
   id: string;
@@ -283,7 +283,7 @@ export interface FacadeSide {
 
 export interface PathologyCategory {
   id: string;
-  companyId: string;
+  projectId: string;
   name: string; // "Fissura", "Infiltração", "Desplacamento", etc.
   color: string; // Hex color (e.g., "#FF5733")
   description?: string;
@@ -294,7 +294,7 @@ export interface PathologyCategory {
   updatedAt: string;
 
   // Relations
-  company?: Company;
+  project?: Project;
   markers?: PathologyMarker[];
 }
 

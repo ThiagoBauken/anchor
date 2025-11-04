@@ -31,34 +31,45 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { company: true }
-        })
-
-        if (!user || !user.active || !user.password) {
+        // Check if Prisma is available
+        if (!prisma) {
+          console.error('❌ Prisma client is null - database not available')
           return null
         }
 
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
-        if (!isPasswordValid) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            include: { company: true }
+          })
+
+          if (!user || !user.active || !user.password) {
+            return null
+          }
+
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+          if (!isPasswordValid) {
+            return null
+          }
+
+          // Update last login
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLogin: new Date() }
+          })
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role,
+            companyId: user.companyId,
+            company: user.company
+          }
+        } catch (error) {
+          console.error('❌ Database error in authorize:', error)
           return null
-        }
-
-        // Update last login
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLogin: new Date() }
-        })
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
-          companyId: user.companyId,
-          company: user.company
         }
       }
     })
@@ -67,27 +78,38 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       // For Google OAuth
       if (account?.provider === 'google' && profile?.email) {
-        // Check if user exists with this email
-        const existingUser = await prisma.user.findUnique({
-          where: { email: profile.email },
-          include: { company: true }
-        })
+        // Check if Prisma is available
+        if (!prisma) {
+          console.error('❌ Prisma client is null in signIn callback')
+          return false
+        }
 
-        if (existingUser) {
-          // Update image and emailVerified
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              image: (profile as any).picture || (profile as any).image || null,
-              emailVerified: new Date(),
-              lastLogin: new Date()
-            }
+        try {
+          // Check if user exists with this email
+          const existingUser = await prisma.user.findUnique({
+            where: { email: profile.email },
+            include: { company: true }
           })
-          return true
-        } else {
-          // User doesn't exist - need to complete registration
-          // We'll handle this in the session callback
-          return true
+
+          if (existingUser) {
+            // Update image and emailVerified
+            await prisma.user.update({
+              where: { id: existingUser.id },
+              data: {
+                image: (profile as any).picture || (profile as any).image || null,
+                emailVerified: new Date(),
+                lastLogin: new Date()
+              }
+            })
+            return true
+          } else {
+            // User doesn't exist - need to complete registration
+            // We'll handle this in the session callback
+            return true
+          }
+        } catch (error) {
+          console.error('❌ Database error in signIn callback:', error)
+          return false
         }
       }
 

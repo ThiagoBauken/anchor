@@ -214,7 +214,7 @@ export function FacadeMarkerCanvas({
       categoryId: selectedCategoryId,
       geometry: { points: originalPoints },
       area,
-      severity: category?.severity || 'MEDIUM',
+      severity: category?.severity || 'medium',
       status: 'PENDING',
       priority: 0,
       photos: []

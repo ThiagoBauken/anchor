@@ -140,11 +140,11 @@ export async function createFacadeInspection(
         projectId,
         name,
         description,
-        status: 'SCHEDULED',
+        status: 'scheduled',
         scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
         inspectorName,
         engineerId,
-        createdByUserId
+        createdById: createdByUserId
       },
       include: {
         facadeSides: true,
@@ -218,7 +218,7 @@ export async function deleteFacadeInspection(inspectionId: string) {
 export async function getFacadeSidesForInspection(inspectionId: string) {
   try {
     const sides = await prisma.facadeSide.findMany({
-      where: { inspectionId },
+      where: { facadeInspectionId: inspectionId },
       include: {
         pathologyMarkers: {
           include: {
@@ -254,7 +254,7 @@ export async function createFacadeSide(
   try {
     const side = await prisma.facadeSide.create({
       data: {
-        inspectionId,
+        facadeInspectionId: inspectionId,
         name,
         sideType,
         image,
@@ -329,10 +329,10 @@ export async function deleteFacadeSide(sideId: string) {
 
 // ===== PATHOLOGY CATEGORY CRUD =====
 
-export async function getPathologyCategoriesForCompany(companyId: string) {
+export async function getPathologyCategoriesForProject(projectId: string) {
   try {
     const categories = await prisma.pathologyCategory.findMany({
-      where: { companyId },
+      where: { projectId },
       orderBy: { order: 'asc' }
     });
     return categories;
@@ -343,7 +343,7 @@ export async function getPathologyCategoriesForCompany(companyId: string) {
 }
 
 export async function createPathologyCategory(
-  companyId: string,
+  projectId: string,
   name: string,
   color: string,
   severity: PathologySeverity,
@@ -353,13 +353,12 @@ export async function createPathologyCategory(
   try {
     const category = await prisma.pathologyCategory.create({
       data: {
-        companyId,
+        projectId,
         name,
         color,
         severity,
         order,
-        description,
-        active: true
+        description
       }
     });
     return category;
@@ -464,11 +463,11 @@ export async function createPathologyMarker(
         facadeSideId,
         categoryId,
         geometry,
-        createdByUserId,
+        createdById: createdByUserId,
         area: metadata?.area,
         floor: metadata?.floor,
         division: metadata?.division,
-        severity: metadata?.severity || 'MEDIUM',
+        severity: metadata?.severity || 'medium',
         description: metadata?.description,
         observations: metadata?.observations,
         status: metadata?.status || 'PENDING',
@@ -547,7 +546,7 @@ export async function deletePathologyMarker(markerId: string) {
 export async function getReportsForInspection(inspectionId: string) {
   try {
     const reports = await prisma.inspectionReport.findMany({
-      where: { inspectionId },
+      where: { facadeInspectionId: inspectionId },
       include: {
         engineer: {
           select: {
@@ -583,14 +582,14 @@ export async function createInspectionReport(
   try {
     // Get the next version number
     const latestReport = await prisma.inspectionReport.findFirst({
-      where: { inspectionId },
+      where: { facadeInspectionId: inspectionId },
       orderBy: { version: 'desc' }
     });
     const nextVersion = (latestReport?.version || 0) + 1;
 
     const report = await prisma.inspectionReport.create({
       data: {
-        inspectionId,
+        facadeInspectionId: inspectionId,
         engineerId,
         reportNumber,
         title,
@@ -690,7 +689,7 @@ export async function rejectInspectionReport(reportId: string, rejectionReason: 
     const report = await prisma.inspectionReport.update({
       where: { id: reportId },
       data: {
-        status: 'REJECTED',
+        status: 'rejected',
         rejectedAt: new Date(),
         rejectionReason
       },
@@ -725,53 +724,52 @@ export async function deleteInspectionReport(reportId: string) {
 
 // ===== SEED DEFAULT CATEGORIES =====
 
-export async function seedDefaultPathologyCategories(companyId: string) {
+export async function seedDefaultPathologyCategories(projectId: string) {
   try {
     const defaultCategories = [
       // CRÍTICOS (Vermelho/Laranja escuros)
-      { name: 'Desplacamento Crítico', color: '#C0392B', severity: 'CRITICAL' as PathologySeverity, order: 1, description: 'Desplacamento em estado crítico com risco iminente' },
-      { name: 'Desplacamento Total', color: '#E74C3C', severity: 'CRITICAL' as PathologySeverity, order: 2, description: 'Destacamento completo de revestimento' },
-      { name: 'Falta de Ancoragem', color: '#D63031', severity: 'CRITICAL' as PathologySeverity, order: 3, description: 'Ausência ou falha de ancoragem estrutural' },
-      { name: 'Falta de Para-raios', color: '#E17055', severity: 'CRITICAL' as PathologySeverity, order: 4, description: 'Para-raios ausente ou caindo' },
-      { name: 'Corrosão', color: '#E67E22', severity: 'CRITICAL' as PathologySeverity, order: 5, description: 'Corrosão de armaduras ou elementos metálicos' },
+      { name: 'Desplacamento Crítico', color: '#C0392B', severity: 'critical' as PathologySeverity, order: 1, description: 'Desplacamento em estado crítico com risco iminente' },
+      { name: 'Desplacamento Total', color: '#E74C3C', severity: 'critical' as PathologySeverity, order: 2, description: 'Destacamento completo de revestimento' },
+      { name: 'Falta de Ancoragem', color: '#D63031', severity: 'critical' as PathologySeverity, order: 3, description: 'Ausência ou falha de ancoragem estrutural' },
+      { name: 'Falta de Para-raios', color: '#E17055', severity: 'critical' as PathologySeverity, order: 4, description: 'Para-raios ausente ou caindo' },
+      { name: 'Corrosão', color: '#E67E22', severity: 'critical' as PathologySeverity, order: 5, description: 'Corrosão de armaduras ou elementos metálicos' },
 
       // ALTOS (Laranjas/Amarelos)
-      { name: 'Trinca', color: '#FF7675', severity: 'HIGH' as PathologySeverity, order: 6, description: 'Trincas e fissuras na estrutura ou revestimento' },
-      { name: 'Infiltração', color: '#FD79A8', severity: 'HIGH' as PathologySeverity, order: 7, description: 'Sinais de infiltração de água' },
-      { name: 'Falta de Pingadeira', color: '#FDCB6E', severity: 'HIGH' as PathologySeverity, order: 8, description: 'Ausência de pingadeira ou rufos' },
-      { name: 'Vidros Quebrados/Trincados', color: '#F39C12', severity: 'HIGH' as PathologySeverity, order: 9, description: 'Vidros danificados ou trincados' },
+      { name: 'Trinca', color: '#FF7675', severity: 'high' as PathologySeverity, order: 6, description: 'Trincas e fissuras na estrutura ou revestimento' },
+      { name: 'Infiltração', color: '#FD79A8', severity: 'high' as PathologySeverity, order: 7, description: 'Sinais de infiltração de água' },
+      { name: 'Falta de Pingadeira', color: '#FDCB6E', severity: 'high' as PathologySeverity, order: 8, description: 'Ausência de pingadeira ou rufos' },
+      { name: 'Vidros Quebrados/Trincados', color: '#F39C12', severity: 'high' as PathologySeverity, order: 9, description: 'Vidros danificados ou trincados' },
 
       // MÉDIOS (Azuis/Verdes/Roxos)
-      { name: 'Reboco Solto', color: '#74B9FF', severity: 'MEDIUM' as PathologySeverity, order: 10, description: 'Reboco em processo de desplacamento' },
-      { name: 'Pastilha Solta', color: '#A29BFE', severity: 'MEDIUM' as PathologySeverity, order: 11, description: 'Pastilhas soltas ou em deslocamento' },
-      { name: 'Falta de Rejunte', color: '#6C5CE7', severity: 'MEDIUM' as PathologySeverity, order: 12, description: 'Ausência ou deterioração de rejunte' },
-      { name: 'Junta de Dilatação', color: '#00B894', severity: 'MEDIUM' as PathologySeverity, order: 13, description: 'Problemas em juntas de dilatação' },
-      { name: 'Umidade', color: '#00CEC9', severity: 'MEDIUM' as PathologySeverity, order: 14, description: 'Manchas de umidade e bolor/mofo' },
-      { name: 'Falta de Silicone', color: '#81ECEC', severity: 'MEDIUM' as PathologySeverity, order: 15, description: 'Ausência ou deterioração de silicone' },
-      { name: 'Falta de Desvios', color: '#55EFC4', severity: 'MEDIUM' as PathologySeverity, order: 16, description: 'Ausência de desvios ou calhas' },
+      { name: 'Reboco Solto', color: '#74B9FF', severity: 'medium' as PathologySeverity, order: 10, description: 'Reboco em processo de desplacamento' },
+      { name: 'Pastilha Solta', color: '#A29BFE', severity: 'medium' as PathologySeverity, order: 11, description: 'Pastilhas soltas ou em deslocamento' },
+      { name: 'Falta de Rejunte', color: '#6C5CE7', severity: 'medium' as PathologySeverity, order: 12, description: 'Ausência ou deterioração de rejunte' },
+      { name: 'Junta de Dilatação', color: '#00B894', severity: 'medium' as PathologySeverity, order: 13, description: 'Problemas em juntas de dilatação' },
+      { name: 'Umidade', color: '#00CEC9', severity: 'medium' as PathologySeverity, order: 14, description: 'Manchas de umidade e bolor/mofo' },
+      { name: 'Falta de Silicone', color: '#81ECEC', severity: 'medium' as PathologySeverity, order: 15, description: 'Ausência ou deterioração de silicone' },
+      { name: 'Falta de Desvios', color: '#55EFC4', severity: 'medium' as PathologySeverity, order: 16, description: 'Ausência de desvios ou calhas' },
 
       // BAIXOS (Tons claros/pastéis)
-      { name: 'Eflorescência', color: '#DDA0DD', severity: 'LOW' as PathologySeverity, order: 17, description: 'Depósitos salinos na superfície (manchas brancas)' },
-      { name: 'Desgaste', color: '#95A5A6', severity: 'LOW' as PathologySeverity, order: 18, description: 'Desgaste natural do tempo' },
-      { name: 'Tinta Solta', color: '#DFE6E9', severity: 'LOW' as PathologySeverity, order: 19, description: 'Pintura descascando ou solta' },
-      { name: 'Textura Solta', color: '#B2BEC3', severity: 'LOW' as PathologySeverity, order: 20, description: 'Textura em desplacamento' },
-      { name: 'Moldura', color: '#636E72', severity: 'LOW' as PathologySeverity, order: 21, description: 'Problemas em molduras decorativas' },
-      { name: 'Molduras em Isopor', color: '#A29BFE', severity: 'LOW' as PathologySeverity, order: 22, description: 'Molduras de isopor danificadas' },
-      { name: 'Molduras em Gesso', color: '#F8A5C2', severity: 'LOW' as PathologySeverity, order: 23, description: 'Molduras de gesso com problemas' },
-      { name: 'Silicone', color: '#FFEAA7', severity: 'LOW' as PathologySeverity, order: 24, description: 'Silicone envelhecido ou manchado' }
+      { name: 'Eflorescência', color: '#DDA0DD', severity: 'low' as PathologySeverity, order: 17, description: 'Depósitos salinos na superfície (manchas brancas)' },
+      { name: 'Desgaste', color: '#95A5A6', severity: 'low' as PathologySeverity, order: 18, description: 'Desgaste natural do tempo' },
+      { name: 'Tinta Solta', color: '#DFE6E9', severity: 'low' as PathologySeverity, order: 19, description: 'Pintura descascando ou solta' },
+      { name: 'Textura Solta', color: '#B2BEC3', severity: 'low' as PathologySeverity, order: 20, description: 'Textura em desplacamento' },
+      { name: 'Moldura', color: '#636E72', severity: 'low' as PathologySeverity, order: 21, description: 'Problemas em molduras decorativas' },
+      { name: 'Molduras em Isopor', color: '#A29BFE', severity: 'low' as PathologySeverity, order: 22, description: 'Molduras de isopor danificadas' },
+      { name: 'Molduras em Gesso', color: '#F8A5C2', severity: 'low' as PathologySeverity, order: 23, description: 'Molduras de gesso com problemas' },
+      { name: 'Silicone', color: '#FFEAA7', severity: 'low' as PathologySeverity, order: 24, description: 'Silicone envelhecido ou manchado' }
     ];
 
     const createdCategories = [];
     for (const category of defaultCategories) {
       const created = await prisma.pathologyCategory.create({
         data: {
-          companyId,
+          projectId,
           name: category.name,
           color: category.color,
           severity: category.severity,
           order: category.order,
-          description: category.description,
-          active: true
+          description: category.description
         }
       });
       createdCategories.push(created);

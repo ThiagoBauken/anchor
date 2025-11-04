@@ -7,7 +7,8 @@ import {
   PathologyCategory,
   PathologyMarker,
   InspectionStatus,
-  FacadeSideType
+  FacadeSideType,
+  PathologySeverity
 } from '@/types';
 import {
   getInspectionsForProject,
@@ -17,7 +18,7 @@ import {
   createFacadeSide,
   updateFacadeSide,
   deleteFacadeSide,
-  getPathologyCategoriesForCompany,
+  getPathologyCategoriesForProject,
   createPathologyCategory,
   seedDefaultPathologyCategories,
   createPathologyMarker,
@@ -72,12 +73,12 @@ export function FacadeInspectionManager({
   const [newInspectionDescription, setNewInspectionDescription] = useState('');
 
   const [newSideName, setNewSideName] = useState('');
-  const [newSideType, setNewSideType] = useState<FacadeSideType>('NORTH');
+  const [newSideType, setNewSideType] = useState<FacadeSideType>('front');
   const [newSideImage, setNewSideImage] = useState('');
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#FF5733');
-  const [newCategorySeverity, setNewCategorySeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
+  const [newCategorySeverity, setNewCategorySeverity] = useState<PathologySeverity>('medium');
 
   // Load data
   useEffect(() => {
@@ -88,7 +89,7 @@ export function FacadeInspectionManager({
     setLoading(true);
     const [inspectionsData, categoriesData] = await Promise.all([
       getInspectionsForProject(projectId),
-      getPathologyCategoriesForCompany(companyId)
+      getPathologyCategoriesForProject(projectId)
     ]);
 
     setInspections(inspectionsData as any);
@@ -96,7 +97,7 @@ export function FacadeInspectionManager({
 
     // Seed default categories if none exist
     if (categoriesData.length === 0) {
-      const seededCategories = await seedDefaultPathologyCategories(companyId);
+      const seededCategories = await seedDefaultPathologyCategories(projectId);
       setCategories(seededCategories as any);
     }
 
@@ -164,7 +165,7 @@ export function FacadeInspectionManager({
         );
 
         setNewSideName('');
-        setNewSideType('NORTH');
+        setNewSideType('front');
         setNewSideImage('');
         setShowAddSideModal(false);
       }
@@ -200,7 +201,7 @@ export function FacadeInspectionManager({
       setCategories(prev => [...prev, category as any]);
       setNewCategoryName('');
       setNewCategoryColor('#FF5733');
-      setNewCategorySeverity('MEDIUM');
+      setNewCategorySeverity('medium');
       setShowCategoryModal(false);
     }
   };
@@ -278,11 +279,11 @@ export function FacadeInspectionManager({
   // Get status badge color
   const getStatusBadgeVariant = (status: InspectionStatus) => {
     switch (status) {
-      case 'SCHEDULED': return 'default';
-      case 'IN_PROGRESS': return 'secondary';
-      case 'COMPLETED': return 'default';
-      case 'APPROVED': return 'default';
-      case 'REJECTED': return 'destructive';
+      case 'scheduled': return 'default';
+      case 'in_progress': return 'secondary';
+      case 'completed': return 'default';
+      case 'approved': return 'default';
+      case 'rejected': return 'destructive';
       default: return 'default';
     }
   };
@@ -356,10 +357,10 @@ export function FacadeInspectionManager({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="LOW">Baixa</SelectItem>
-                      <SelectItem value="MEDIUM">Média</SelectItem>
-                      <SelectItem value="HIGH">Alta</SelectItem>
-                      <SelectItem value="CRITICAL">Crítica</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="critical">Crítica</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -479,12 +480,11 @@ export function FacadeInspectionManager({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="NORTH">Norte</SelectItem>
-                              <SelectItem value="SOUTH">Sul</SelectItem>
-                              <SelectItem value="EAST">Leste</SelectItem>
-                              <SelectItem value="WEST">Oeste</SelectItem>
-                              <SelectItem value="ROOF">Telhado</SelectItem>
-                              <SelectItem value="OTHER">Outro</SelectItem>
+                              <SelectItem value="front">Frente</SelectItem>
+                              <SelectItem value="back">Atrás</SelectItem>
+                              <SelectItem value="left">Esquerda</SelectItem>
+                              <SelectItem value="right">Direita</SelectItem>
+                              <SelectItem value="internal">Interna</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

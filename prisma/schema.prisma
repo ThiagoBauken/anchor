@@ -795,20 +795,25 @@ model FloorPlan {
 
 // Facade Inspection System
 model FacadeInspection {
-  id          String                @id @default(cuid())
-  projectId   String                @map("project_id")
-  name        String
-  description String?
-  status      InspectionStatus      @default(in_progress)
-  engineerId  String?               @map("engineer_id")
-  createdById String                @map("created_by_id")
-  createdAt   DateTime              @default(now()) @map("created_at")
-  updatedAt   DateTime              @updatedAt @map("updated_at")
-  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engineer    User?                 @relation("InspectionEngineer", fields: [engineerId], references: [id])
-  createdBy   User                  @relation("InspectionCreator", fields: [createdById], references: [id])
-  facadeSides FacadeSide[]
-  reports     InspectionReport[]
+  id             String                @id @default(cuid())
+  projectId      String                @map("project_id")
+  name           String
+  description    String?
+  status         InspectionStatus      @default(in_progress)
+  scheduledDate  DateTime?             @map("scheduled_date")
+  startedAt      DateTime?             @map("started_at")
+  completedAt    DateTime?             @map("completed_at")
+  inspectorId    String?               @map("inspector_id")
+  inspectorName  String?               @map("inspector_name")
+  engineerId     String?               @map("engineer_id")
+  createdById    String                @map("created_by_id")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineer       User?                 @relation("InspectionEngineer", fields: [engineerId], references: [id])
+  createdBy      User                  @relation("InspectionCreator", fields: [createdById], references: [id])
+  facadeSides    FacadeSide[]
+  reports        InspectionReport[]
 
   @@index([projectId])
   @@index([status])
@@ -816,16 +821,24 @@ model FacadeInspection {
 }
 
 model FacadeSide {
-  id                  String             @id @default(cuid())
-  facadeInspectionId  String             @map("facade_inspection_id")
-  name                String
-  sideType            FacadeSideType     @map("side_type")
-  image               String             @db.Text // Base64 floor plan image
-  order               Int                @default(0)
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
-  facadeInspection    FacadeInspection   @relation(fields: [facadeInspectionId], references: [id], onDelete: Cascade)
-  pathologyMarkers    PathologyMarker[]
+  id                   String             @id @default(cuid())
+  facadeInspectionId   String             @map("facade_inspection_id")
+  name                 String
+  sideType             FacadeSideType     @map("side_type")
+  image                String             @db.Text // Base64 floor plan image
+  dronePhotoDate       DateTime?          @map("drone_photo_date")
+  weather              String?
+  photographer         String?
+  notes                String?
+  imageWidth           Int?               @map("image_width")
+  imageHeight          Int?               @map("image_height")
+  availableFloors      String[]           @default([]) @map("available_floors")
+  availableDivisions   String[]           @default([]) @map("available_divisions")
+  order                Int                @default(0)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  facadeInspection     FacadeInspection   @relation(fields: [facadeInspectionId], references: [id], onDelete: Cascade)
+  pathologyMarkers     PathologyMarker[]
 
   @@index([facadeInspectionId])
   @@map("facade_sides")
@@ -838,6 +851,8 @@ model PathologyCategory {
   color             String            // Hex color
   severity          PathologySeverity @default(medium)
   description       String?
+  active            Boolean           @default(true)
+  order             Int               @default(0)
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -851,10 +866,15 @@ model PathologyMarker {
   id            String             @id @default(cuid())
   facadeSideId  String             @map("facade_side_id")
   categoryId    String             @map("category_id")
-  x             Float              // X coordinate on image (percentage)
-  y             Float              // Y coordinate on image (percentage)
-  description   String?
+  geometry      Json               // Polygon points: { points: [{ x, y }, ...] }
+  area          Float?             // Area in square meters
+  floor         String?            // Floor identification
+  division      String?            // Division identification
   severity      PathologySeverity  @default(medium)
+  description   String?
+  observations  String?
+  status        String             @default("PENDING")
+  priority      Int                @default(0)
   photos        String[]           @default([]) // Array of base64 images
   createdById   String             @map("created_by_id")
   createdAt     DateTime           @default(now()) @map("created_at")
@@ -872,12 +892,17 @@ model InspectionReport {
   id                  String           @id @default(cuid())
   facadeInspectionId  String           @map("facade_inspection_id")
   version             Int              @default(1)
+  reportNumber        String           @map("report_number")
   title               String
-  summary             String           @db.Text
-  recommendations     String           @db.Text
+  content             String           @db.Text
+  status              String           @default("DRAFT")
   engineerId          String           @map("engineer_id")
+  generatedAt         DateTime         @default(now()) @map("generated_at")
   approverId          String?          @map("approver_id")
   approvedAt          DateTime?        @map("approved_at")
+  approvedBy          String?          @map("approved_by")
+  rejectedAt          DateTime?        @map("rejected_at")
+  rejectionReason     String?          @map("rejection_reason")
   pdfUrl              String?          @map("pdf_url")
   createdAt           DateTime         @default(now()) @map("created_at")
   updatedAt           DateTime         @updatedAt @map("updated_at")
@@ -912,9 +937,11 @@ enum PaymentStatus {
 }
 
 enum InspectionStatus {
+  scheduled
   in_progress
   completed
   approved
+  rejected
   archived
 }
 

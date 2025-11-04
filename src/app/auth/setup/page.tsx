@@ -9,8 +9,11 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Building2, Users2, Loader2 } from 'lucide-react'
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic'
+
 export default function SetupPage() {
-  const { data: session, status, update } = useSession()
+  const sessionData = useSession()
   const router = useRouter()
   const [step, setStep] = useState<'type-selection' | 'form'>('type-selection')
   const [companyType, setCompanyType] = useState<'administradora' | 'alpinista' | null>(null)
@@ -20,6 +23,13 @@ export default function SetupPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Handle undefined session during SSR
+  if (!sessionData) {
+    return null
+  }
+
+  const { data: session, status, update } = sessionData
 
   useEffect(() => {
     // Redirect if already has company setup

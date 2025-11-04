@@ -33,7 +33,7 @@ export function PathologyCategoryEditor({
   // Edit form states
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
-  const [editSeverity, setEditSeverity] = useState<PathologySeverity>('MEDIUM');
+  const [editSeverity, setEditSeverity] = useState<PathologySeverity>('medium');
   const [editDescription, setEditDescription] = useState('');
 
   // Open edit modal
@@ -79,10 +79,10 @@ export function PathologyCategoryEditor({
   // Get severity label
   const getSeverityLabel = (severity: PathologySeverity) => {
     const labels = {
-      LOW: 'Baixa',
-      MEDIUM: 'Média',
-      HIGH: 'Alta',
-      CRITICAL: 'Crítica'
+      low: 'Baixa',
+      medium: 'Média',
+      high: 'Alta',
+      critical: 'Crítica'
     };
     return labels[severity];
   };
@@ -90,10 +90,10 @@ export function PathologyCategoryEditor({
   // Get severity badge color
   const getSeverityColor = (severity: PathologySeverity) => {
     const colors = {
-      LOW: 'bg-gray-100 text-gray-800',
-      MEDIUM: 'bg-blue-100 text-blue-800',
-      HIGH: 'bg-orange-100 text-orange-800',
-      CRITICAL: 'bg-red-100 text-red-800'
+      low: 'bg-gray-100 text-gray-800',
+      medium: 'bg-blue-100 text-blue-800',
+      high: 'bg-orange-100 text-orange-800',
+      critical: 'bg-red-100 text-red-800'
     };
     return colors[severity];
   };
@@ -241,10 +241,10 @@ export function PathologyCategoryEditor({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="LOW">Baixa</SelectItem>
-                    <SelectItem value="MEDIUM">Média</SelectItem>
-                    <SelectItem value="HIGH">Alta</SelectItem>
-                    <SelectItem value="CRITICAL">Crítica</SelectItem>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="critical">Crítica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

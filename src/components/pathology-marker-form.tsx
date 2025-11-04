@@ -36,7 +36,7 @@ export function PathologyMarkerForm({
     floor: marker?.floor || '',
     division: marker?.division || '',
     categoryId: marker?.categoryId || '',
-    severity: marker?.severity || 'MEDIUM' as PathologySeverity,
+    severity: marker?.severity || 'medium' as PathologySeverity,
     description: marker?.description || '',
     observations: marker?.observations || '',
     status: marker?.status || 'PENDING',
@@ -179,10 +179,10 @@ export function PathologyMarkerForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LOW">🟢 Baixa</SelectItem>
-                <SelectItem value="MEDIUM">🟡 Média</SelectItem>
-                <SelectItem value="HIGH">🟠 Alta</SelectItem>
-                <SelectItem value="CRITICAL">🔴 Crítica</SelectItem>
+                <SelectItem value="low">🟢 Baixa</SelectItem>
+                <SelectItem value="medium">🟡 Média</SelectItem>
+                <SelectItem value="high">🟠 Alta</SelectItem>
+                <SelectItem value="critical">🔴 Crítica</SelectItem>
               </SelectContent>
             </Select>
           </div>
