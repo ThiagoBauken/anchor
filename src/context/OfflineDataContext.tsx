@@ -166,6 +166,49 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     }
   }, [currentProject])
 
+  // Load floor plans when current project changes
+  useEffect(() => {
+    const loadFloorPlans = async () => {
+      if (!currentProject) {
+        setFloorPlans([])
+        setCurrentFloorPlan(null)
+        return
+      }
+
+      try {
+        console.log('🔄 Loading floor plans for project:', currentProject.name)
+        const { getFloorPlansForProject } = await import('@/app/actions/floorplan-actions')
+        const loadedFloorPlans = await getFloorPlansForProject(currentProject.id)
+
+        // Convert Date objects to strings for FloorPlan type
+        const convertedFloorPlans: FloorPlan[] = loadedFloorPlans.map(fp => ({
+          id: fp.id,
+          projectId: fp.projectId,
+          name: fp.name,
+          image: fp.image,
+          order: fp.order,
+          active: fp.active,
+          createdAt: new Date(fp.createdAt).toISOString(),
+          updatedAt: new Date(fp.updatedAt).toISOString(),
+          anchorPoints: []
+        }))
+
+        setFloorPlans(convertedFloorPlans)
+        console.log('✅ Floor plans loaded:', convertedFloorPlans.length)
+
+        // Reset current floor plan if it doesn't belong to this project
+        if (currentFloorPlan && currentFloorPlan.projectId !== currentProject.id) {
+          setCurrentFloorPlan(null)
+        }
+      } catch (error) {
+        console.error('❌ Error loading floor plans:', error)
+        setFloorPlans([])
+      }
+    }
+
+    loadFloorPlans()
+  }, [currentProject?.id]) // Only re-run when project ID changes
+
   // Persist showArchived setting
   useEffect(() => {
     localStorage.setItem('anchorViewShowArchived', JSON.stringify(showArchived))
@@ -243,32 +286,8 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
       setPoints(loadedPoints)
       setTests(loadedTests)
 
-      // Load floor plans for current project
-      if (currentProject) {
-        try {
-          const { getFloorPlansForProject } = await import('@/app/actions/floorplan-actions')
-          const loadedFloorPlans = await getFloorPlansForProject(currentProject.id)
-          // Convert Date objects to strings for FloorPlan type
-          const convertedFloorPlans: FloorPlan[] = loadedFloorPlans.map(fp => ({
-            id: fp.id,
-            projectId: fp.projectId,
-            name: fp.name,
-            image: fp.image,
-            order: fp.order,
-            active: fp.active,
-            createdAt: new Date(fp.createdAt).toISOString(),
-            updatedAt: new Date(fp.updatedAt).toISOString(),
-            anchorPoints: []
-          }))
-          setFloorPlans(convertedFloorPlans)
-        } catch (error) {
-          console.error('Error loading floor plans:', error)
-          setFloorPlans([])
-        }
-      } else {
-        setFloorPlans([])
-      }
-      
+      // Floor plans will be loaded by the useEffect that watches currentProject
+
       // Set default project if none selected
       if (!currentProject && loadedProjects.length > 0) {
         // Try to restore previously selected project
