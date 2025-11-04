@@ -1,20 +1,19 @@
-
 version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: always
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER:-anchor}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_DB=${POSTGRES_DB:-anchorview}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - '5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-anchor} -d ${POSTGRES_DB:-anchorview}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,10 +29,13 @@ services:
     ports:
       - '9002:9002'
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-anchor}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-anchorview}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:9002}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
     command: >
-      sh -c "pnpm prisma migrate deploy &&
+      sh -c "npx prisma migrate deploy &&
              node server.js"
 
 volumes:

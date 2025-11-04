@@ -1,33 +1,55 @@
 # Install dependencies only when needed
-FROM node:20-slim AS deps
-# Install openssl for Prisma
-RUN apt-get update && apt-get install -y openssl
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN npm ci
 
 # Rebuild the source code only when needed
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm prisma generate
-RUN pnpm build
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Build Next.js app with standalone output
+ENV NEXT_TELEMETRY_DISABLED 1
+RUN npm run build
 
 # Production image, copy all the files and run next
-FROM node:20-slim AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
+
 ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy necessary files from builder
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/server.js ./
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Expose the port the app runs on
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
 EXPOSE 9002
 
-# Set the command to start the app
+ENV PORT 9002
+ENV HOSTNAME "0.0.0.0"
+
+# Start the application
 CMD ["node", "server.js"]
