@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id      String    @id @default(cuid())
+  name    String
+  users   User[]
+  projects Project[]
+  locations Location[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      String   // "admin" or "user"
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  projects  Project[]
+  createdPoints AnchorPoint[] @relation("CreatedPoints")
+  modifiedPoints AnchorPoint[] @relation("ModifiedPoints")
+  tests     AnchorTest[]
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  name        String
+  markerShape String   // 'circle', 'square', 'x', '+'
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  floorPlanImages String[]
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  // Report fields
+  obraAddress                String?
+  obraCEP                    String?
+  obraCNPJ                   String?
+  contratanteName            String?
+  contratanteAddress         String?
+  contratanteCEP             String?
+  cnpjContratado             String?
+  contato                    String?
+  valorContrato              String?
+  dataInicio                 String?
+  dataTermino                String?
+  responsavelTecnico         String?
+  registroCREA               String?
+  tituloProfissional         String?
+  numeroART                  String?
+  rnp                        String?
+  cargaDeTestePadrao         String?
+  tempoDeTestePadrao         String?
+  engenheiroResponsavelPadrao String?
+  dispositivoDeAncoragemPadrao String?
+  
+  anchorPoints AnchorPoint[]
+}
+
+// NOVO: Migrado do localStorage para o banco
+model AnchorPoint {
+  id                        String   @id @default(cuid())
+  projectId                 String
+  project                   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  numeroPonto               String
+  localizacao               String
+  foto                      String?  @db.Text // base64 image
+  numeroLacre               String?
+  tipoEquipamento           String?
+  dataInstalacao            DateTime?
+  frequenciaInspecaoMeses   Int?
+  observacoes               String?  @db.Text
+  posicaoX                  Float
+  posicaoY                  Float
+  dataHora                  DateTime @default(now())
+  status                    String   @default("Não Testado") // 'Aprovado' | 'Reprovado' | 'Não Testado'
+  createdByUserId           String?
+  createdByUser             User?    @relation("CreatedPoints", fields: [createdByUserId], references: [id])
+  lastModifiedByUserId      String?
+  lastModifiedByUser        User?    @relation("ModifiedPoints", fields: [lastModifiedByUserId], references: [id])
+  archived                  Boolean  @default(false)
+  archivedAt                DateTime?
+  tests                     AnchorTest[]
+  
+  @@index([projectId])
+  @@index([status])
+  @@index([archived])
+}
+
+// NOVO: Migrado do localStorage para o banco
+model AnchorTest {
+  id                String   @id @default(cuid())
+  pontoId           String
+  ponto             AnchorPoint @relation(fields: [pontoId], references: [id], onDelete: Cascade)
+  dataHora          DateTime @default(now())
+  resultado         String   // 'Aprovado' | 'Reprovado'
+  carga             String
+  tempo             String
+  tecnico           String
+  observacoes       String?  @db.Text
+  fotoTeste         String?  @db.Text // base64 image
+  fotoPronto        String?  @db.Text // base64 image
+  dataFotoPronto    DateTime?
+  createdByUserId   String?
+  createdByUser     User?    @relation(fields: [createdByUserId], references: [id])
+  
+  @@index([pontoId])
+  @@index([resultado])
+}

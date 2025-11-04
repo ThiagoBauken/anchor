@@ -1,0 +1,785 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import {
+  FacadeInspection,
+  FacadeSide,
+  PathologyCategory,
+  PathologyMarker,
+  InspectionReport,
+  InspectionStatus,
+  FacadeSideType,
+  PathologySeverity
+} from '@/types';
+
+// ===== FACADE INSPECTION CRUD =====
+
+export async function getInspectionsForProject(projectId: string) {
+  try {
+    const inspections = await prisma.facadeInspection.findMany({
+      where: { projectId },
+      include: {
+        facadeSides: {
+          include: {
+            pathologyMarkers: {
+              include: {
+                category: true
+              }
+            }
+          }
+        },
+        reports: true,
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return inspections;
+  } catch (error) {
+    console.error('Error fetching facade inspections:', error);
+    return [];
+  }
+}
+
+export async function getInspectionById(inspectionId: string) {
+  try {
+    const inspection = await prisma.facadeInspection.findUnique({
+      where: { id: inspectionId },
+      include: {
+        facadeSides: {
+          include: {
+            pathologyMarkers: {
+              include: {
+                category: true,
+                createdBy: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: { createdAt: 'asc' }
+            }
+          },
+          orderBy: { order: 'asc' }
+        },
+        reports: {
+          include: {
+            engineer: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            approver: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { version: 'desc' }
+        },
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            companyId: true
+          }
+        }
+      }
+    });
+    return inspection;
+  } catch (error) {
+    console.error('Error fetching facade inspection:', error);
+    return null;
+  }
+}
+
+export async function createFacadeInspection(
+  projectId: string,
+  name: string,
+  createdByUserId: string,
+  description?: string,
+  scheduledDate?: string,
+  inspectorName?: string,
+  engineerId?: string
+) {
+  try {
+    const inspection = await prisma.facadeInspection.create({
+      data: {
+        projectId,
+        name,
+        description,
+        status: 'SCHEDULED',
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        inspectorName,
+        engineerId,
+        createdByUserId
+      },
+      include: {
+        facadeSides: true,
+        reports: true
+      }
+    });
+    return inspection;
+  } catch (error) {
+    console.error('Error creating facade inspection:', error);
+    return null;
+  }
+}
+
+export async function updateFacadeInspection(
+  inspectionId: string,
+  data: {
+    name?: string;
+    description?: string;
+    status?: InspectionStatus;
+    scheduledDate?: string;
+    startedAt?: string;
+    completedAt?: string;
+    inspectorId?: string;
+    inspectorName?: string;
+    engineerId?: string;
+  }
+) {
+  try {
+    const updateData: any = { ...data };
+
+    // Convert date strings to Date objects
+    if (data.scheduledDate !== undefined) {
+      updateData.scheduledDate = data.scheduledDate ? new Date(data.scheduledDate) : null;
+    }
+    if (data.startedAt !== undefined) {
+      updateData.startedAt = data.startedAt ? new Date(data.startedAt) : null;
+    }
+    if (data.completedAt !== undefined) {
+      updateData.completedAt = data.completedAt ? new Date(data.completedAt) : null;
+    }
+
+    const inspection = await prisma.facadeInspection.update({
+      where: { id: inspectionId },
+      data: updateData,
+      include: {
+        facadeSides: true,
+        reports: true
+      }
+    });
+    return inspection;
+  } catch (error) {
+    console.error('Error updating facade inspection:', error);
+    return null;
+  }
+}
+
+export async function deleteFacadeInspection(inspectionId: string) {
+  try {
+    await prisma.facadeInspection.delete({
+      where: { id: inspectionId }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting facade inspection:', error);
+    return false;
+  }
+}
+
+// ===== FACADE SIDE CRUD =====
+
+export async function getFacadeSidesForInspection(inspectionId: string) {
+  try {
+    const sides = await prisma.facadeSide.findMany({
+      where: { inspectionId },
+      include: {
+        pathologyMarkers: {
+          include: {
+            category: true
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { order: 'asc' }
+    });
+    return sides;
+  } catch (error) {
+    console.error('Error fetching facade sides:', error);
+    return [];
+  }
+}
+
+export async function createFacadeSide(
+  inspectionId: string,
+  name: string,
+  sideType: FacadeSideType,
+  image: string,
+  order: number,
+  metadata?: {
+    dronePhotoDate?: string;
+    weather?: string;
+    photographer?: string;
+    notes?: string;
+    imageWidth?: number;
+    imageHeight?: number;
+  }
+) {
+  try {
+    const side = await prisma.facadeSide.create({
+      data: {
+        inspectionId,
+        name,
+        sideType,
+        image,
+        order,
+        dronePhotoDate: metadata?.dronePhotoDate ? new Date(metadata.dronePhotoDate) : null,
+        weather: metadata?.weather,
+        photographer: metadata?.photographer,
+        notes: metadata?.notes,
+        imageWidth: metadata?.imageWidth,
+        imageHeight: metadata?.imageHeight
+      },
+      include: {
+        pathologyMarkers: true
+      }
+    });
+    return side;
+  } catch (error) {
+    console.error('Error creating facade side:', error);
+    return null;
+  }
+}
+
+export async function updateFacadeSide(
+  sideId: string,
+  data: {
+    name?: string;
+    sideType?: FacadeSideType;
+    image?: string;
+    order?: number;
+    dronePhotoDate?: string;
+    weather?: string;
+    photographer?: string;
+    notes?: string;
+    imageWidth?: number;
+    imageHeight?: number;
+    availableFloors?: string[];
+    availableDivisions?: string[];
+  }
+) {
+  try {
+    const updateData: any = { ...data };
+
+    if (data.dronePhotoDate !== undefined) {
+      updateData.dronePhotoDate = data.dronePhotoDate ? new Date(data.dronePhotoDate) : null;
+    }
+
+    const side = await prisma.facadeSide.update({
+      where: { id: sideId },
+      data: updateData,
+      include: {
+        pathologyMarkers: true
+      }
+    });
+    return side;
+  } catch (error) {
+    console.error('Error updating facade side:', error);
+    return null;
+  }
+}
+
+export async function deleteFacadeSide(sideId: string) {
+  try {
+    await prisma.facadeSide.delete({
+      where: { id: sideId }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting facade side:', error);
+    return false;
+  }
+}
+
+// ===== PATHOLOGY CATEGORY CRUD =====
+
+export async function getPathologyCategoriesForCompany(companyId: string) {
+  try {
+    const categories = await prisma.pathologyCategory.findMany({
+      where: { companyId },
+      orderBy: { order: 'asc' }
+    });
+    return categories;
+  } catch (error) {
+    console.error('Error fetching pathology categories:', error);
+    return [];
+  }
+}
+
+export async function createPathologyCategory(
+  companyId: string,
+  name: string,
+  color: string,
+  severity: PathologySeverity,
+  order: number,
+  description?: string
+) {
+  try {
+    const category = await prisma.pathologyCategory.create({
+      data: {
+        companyId,
+        name,
+        color,
+        severity,
+        order,
+        description,
+        active: true
+      }
+    });
+    return category;
+  } catch (error) {
+    console.error('Error creating pathology category:', error);
+    return null;
+  }
+}
+
+export async function updatePathologyCategory(
+  categoryId: string,
+  data: {
+    name?: string;
+    color?: string;
+    severity?: PathologySeverity;
+    order?: number;
+    description?: string;
+  }
+) {
+  try {
+    const category = await prisma.pathologyCategory.update({
+      where: { id: categoryId },
+      data
+    });
+    return category;
+  } catch (error) {
+    console.error('Error updating pathology category:', error);
+    return null;
+  }
+}
+
+export async function togglePathologyCategoryActive(categoryId: string, active: boolean) {
+  try {
+    const category = await prisma.pathologyCategory.update({
+      where: { id: categoryId },
+      data: { active }
+    });
+    return category;
+  } catch (error) {
+    console.error('Error toggling pathology category:', error);
+    return null;
+  }
+}
+
+export async function deletePathologyCategory(categoryId: string) {
+  try {
+    await prisma.pathologyCategory.delete({
+      where: { id: categoryId }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting pathology category:', error);
+    return false;
+  }
+}
+
+// ===== PATHOLOGY MARKER CRUD =====
+
+export async function getPathologyMarkersForFacadeSide(facadeSideId: string) {
+  try {
+    const markers = await prisma.pathologyMarker.findMany({
+      where: { facadeSideId },
+      include: {
+        category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    return markers;
+  } catch (error) {
+    console.error('Error fetching pathology markers:', error);
+    return [];
+  }
+}
+
+export async function createPathologyMarker(
+  facadeSideId: string,
+  categoryId: string,
+  geometry: { points: { x: number; y: number }[] },
+  createdByUserId: string,
+  metadata?: {
+    area?: number;
+    floor?: string;
+    division?: string;
+    severity?: PathologySeverity;
+    description?: string;
+    observations?: string;
+    status?: string;
+    priority?: number;
+    photos?: string[];
+  }
+) {
+  try {
+    const marker = await prisma.pathologyMarker.create({
+      data: {
+        facadeSideId,
+        categoryId,
+        geometry,
+        createdByUserId,
+        area: metadata?.area,
+        floor: metadata?.floor,
+        division: metadata?.division,
+        severity: metadata?.severity || 'MEDIUM',
+        description: metadata?.description,
+        observations: metadata?.observations,
+        status: metadata?.status || 'PENDING',
+        priority: metadata?.priority || 0,
+        photos: metadata?.photos || []
+      },
+      include: {
+        category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return marker;
+  } catch (error) {
+    console.error('Error creating pathology marker:', error);
+    return null;
+  }
+}
+
+export async function updatePathologyMarker(
+  markerId: string,
+  data: {
+    geometry?: { points: { x: number; y: number }[] };
+    categoryId?: string;
+    area?: number;
+    floor?: string;
+    severity?: PathologySeverity;
+    description?: string;
+    observations?: string;
+    status?: string;
+    priority?: number;
+    photos?: string[];
+  }
+) {
+  try {
+    const marker = await prisma.pathologyMarker.update({
+      where: { id: markerId },
+      data,
+      include: {
+        category: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return marker;
+  } catch (error) {
+    console.error('Error updating pathology marker:', error);
+    return null;
+  }
+}
+
+export async function deletePathologyMarker(markerId: string) {
+  try {
+    await prisma.pathologyMarker.delete({
+      where: { id: markerId }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting pathology marker:', error);
+    return false;
+  }
+}
+
+// ===== INSPECTION REPORT CRUD =====
+
+export async function getReportsForInspection(inspectionId: string) {
+  try {
+    const reports = await prisma.inspectionReport.findMany({
+      where: { inspectionId },
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { version: 'desc' }
+    });
+    return reports;
+  } catch (error) {
+    console.error('Error fetching inspection reports:', error);
+    return [];
+  }
+}
+
+export async function createInspectionReport(
+  inspectionId: string,
+  engineerId: string,
+  reportNumber: string,
+  title: string,
+  content: string
+) {
+  try {
+    // Get the next version number
+    const latestReport = await prisma.inspectionReport.findFirst({
+      where: { inspectionId },
+      orderBy: { version: 'desc' }
+    });
+    const nextVersion = (latestReport?.version || 0) + 1;
+
+    const report = await prisma.inspectionReport.create({
+      data: {
+        inspectionId,
+        engineerId,
+        reportNumber,
+        title,
+        content,
+        status: 'DRAFT',
+        version: nextVersion,
+        generatedAt: new Date()
+      },
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return report;
+  } catch (error) {
+    console.error('Error creating inspection report:', error);
+    return null;
+  }
+}
+
+export async function updateInspectionReport(
+  reportId: string,
+  data: {
+    title?: string;
+    content?: string;
+    pdfUrl?: string;
+  }
+) {
+  try {
+    const report = await prisma.inspectionReport.update({
+      where: { id: reportId },
+      data,
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return report;
+  } catch (error) {
+    console.error('Error updating inspection report:', error);
+    return null;
+  }
+}
+
+export async function approveInspectionReport(reportId: string, approvedBy: string) {
+  try {
+    const report = await prisma.inspectionReport.update({
+      where: { id: reportId },
+      data: {
+        status: 'APPROVED',
+        approvedAt: new Date(),
+        approvedBy
+      },
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return report;
+  } catch (error) {
+    console.error('Error approving inspection report:', error);
+    return null;
+  }
+}
+
+export async function rejectInspectionReport(reportId: string, rejectionReason: string) {
+  try {
+    const report = await prisma.inspectionReport.update({
+      where: { id: reportId },
+      data: {
+        status: 'REJECTED',
+        rejectedAt: new Date(),
+        rejectionReason
+      },
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+    return report;
+  } catch (error) {
+    console.error('Error rejecting inspection report:', error);
+    return null;
+  }
+}
+
+export async function deleteInspectionReport(reportId: string) {
+  try {
+    await prisma.inspectionReport.delete({
+      where: { id: reportId }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error deleting inspection report:', error);
+    return false;
+  }
+}
+
+// ===== SEED DEFAULT CATEGORIES =====
+
+export async function seedDefaultPathologyCategories(companyId: string) {
+  try {
+    const defaultCategories = [
+      // CRÍTICOS (Vermelho/Laranja escuros)
+      { name: 'Desplacamento Crítico', color: '#C0392B', severity: 'CRITICAL' as PathologySeverity, order: 1, description: 'Desplacamento em estado crítico com risco iminente' },
+      { name: 'Desplacamento Total', color: '#E74C3C', severity: 'CRITICAL' as PathologySeverity, order: 2, description: 'Destacamento completo de revestimento' },
+      { name: 'Falta de Ancoragem', color: '#D63031', severity: 'CRITICAL' as PathologySeverity, order: 3, description: 'Ausência ou falha de ancoragem estrutural' },
+      { name: 'Falta de Para-raios', color: '#E17055', severity: 'CRITICAL' as PathologySeverity, order: 4, description: 'Para-raios ausente ou caindo' },
+      { name: 'Corrosão', color: '#E67E22', severity: 'CRITICAL' as PathologySeverity, order: 5, description: 'Corrosão de armaduras ou elementos metálicos' },
+
+      // ALTOS (Laranjas/Amarelos)
+      { name: 'Trinca', color: '#FF7675', severity: 'HIGH' as PathologySeverity, order: 6, description: 'Trincas e fissuras na estrutura ou revestimento' },
+      { name: 'Infiltração', color: '#FD79A8', severity: 'HIGH' as PathologySeverity, order: 7, description: 'Sinais de infiltração de água' },
+      { name: 'Falta de Pingadeira', color: '#FDCB6E', severity: 'HIGH' as PathologySeverity, order: 8, description: 'Ausência de pingadeira ou rufos' },
+      { name: 'Vidros Quebrados/Trincados', color: '#F39C12', severity: 'HIGH' as PathologySeverity, order: 9, description: 'Vidros danificados ou trincados' },
+
+      // MÉDIOS (Azuis/Verdes/Roxos)
+      { name: 'Reboco Solto', color: '#74B9FF', severity: 'MEDIUM' as PathologySeverity, order: 10, description: 'Reboco em processo de desplacamento' },
+      { name: 'Pastilha Solta', color: '#A29BFE', severity: 'MEDIUM' as PathologySeverity, order: 11, description: 'Pastilhas soltas ou em deslocamento' },
+      { name: 'Falta de Rejunte', color: '#6C5CE7', severity: 'MEDIUM' as PathologySeverity, order: 12, description: 'Ausência ou deterioração de rejunte' },
+      { name: 'Junta de Dilatação', color: '#00B894', severity: 'MEDIUM' as PathologySeverity, order: 13, description: 'Problemas em juntas de dilatação' },
+      { name: 'Umidade', color: '#00CEC9', severity: 'MEDIUM' as PathologySeverity, order: 14, description: 'Manchas de umidade e bolor/mofo' },
+      { name: 'Falta de Silicone', color: '#81ECEC', severity: 'MEDIUM' as PathologySeverity, order: 15, description: 'Ausência ou deterioração de silicone' },
+      { name: 'Falta de Desvios', color: '#55EFC4', severity: 'MEDIUM' as PathologySeverity, order: 16, description: 'Ausência de desvios ou calhas' },
+
+      // BAIXOS (Tons claros/pastéis)
+      { name: 'Eflorescência', color: '#DDA0DD', severity: 'LOW' as PathologySeverity, order: 17, description: 'Depósitos salinos na superfície (manchas brancas)' },
+      { name: 'Desgaste', color: '#95A5A6', severity: 'LOW' as PathologySeverity, order: 18, description: 'Desgaste natural do tempo' },
+      { name: 'Tinta Solta', color: '#DFE6E9', severity: 'LOW' as PathologySeverity, order: 19, description: 'Pintura descascando ou solta' },
+      { name: 'Textura Solta', color: '#B2BEC3', severity: 'LOW' as PathologySeverity, order: 20, description: 'Textura em desplacamento' },
+      { name: 'Moldura', color: '#636E72', severity: 'LOW' as PathologySeverity, order: 21, description: 'Problemas em molduras decorativas' },
+      { name: 'Molduras em Isopor', color: '#A29BFE', severity: 'LOW' as PathologySeverity, order: 22, description: 'Molduras de isopor danificadas' },
+      { name: 'Molduras em Gesso', color: '#F8A5C2', severity: 'LOW' as PathologySeverity, order: 23, description: 'Molduras de gesso com problemas' },
+      { name: 'Silicone', color: '#FFEAA7', severity: 'LOW' as PathologySeverity, order: 24, description: 'Silicone envelhecido ou manchado' }
+    ];
+
+    const createdCategories = [];
+    for (const category of defaultCategories) {
+      const created = await prisma.pathologyCategory.create({
+        data: {
+          companyId,
+          name: category.name,
+          color: category.color,
+          severity: category.severity,
+          order: category.order,
+          description: category.description,
+          active: true
+        }
+      });
+      createdCategories.push(created);
+    }
+
+    return createdCategories;
+  } catch (error) {
+    console.error('Error seeding default pathology categories:', error);
+    return [];
+  }
+}

@@ -1,0 +1,205 @@
+// Schema com sistema de auditoria e histórico
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id      String    @id @default(cuid())
+  name    String
+  users   User[]
+  projects Project[]
+  locations Location[]
+  auditLogs AuditLog[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      String   // "admin" or "user"
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  projects  Project[]
+  createdPoints AnchorPoint[] @relation("CreatedPoints")
+  modifiedPoints AnchorPoint[] @relation("ModifiedPoints")
+  tests     AnchorTest[]
+  auditLogs AuditLog[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  name        String
+  markerShape String   // 'circle', 'square', 'x', '+'
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  floorPlanImages String[]
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  // Report fields
+  obraAddress                String?
+  obraCEP                    String?
+  obraCNPJ                   String?
+  contratanteName            String?
+  contratanteAddress         String?
+  contratanteCEP             String?
+  cnpjContratado             String?
+  contato                    String?
+  valorContrato              String?
+  dataInicio                 String?
+  dataTermino                String?
+  responsavelTecnico         String?
+  registroCREA               String?
+  tituloProfissional         String?
+  numeroART                  String?
+  rnp                        String?
+  cargaDeTestePadrao         String?
+  tempoDeTestePadrao         String?
+  engenheiroResponsavelPadrao String?
+  dispositivoDeAncoragemPadrao String?
+  
+  anchorPoints AnchorPoint[]
+  
+  // Sync status
+  syncStatus    String @default("synced") // "synced", "pending", "conflict"
+  localVersion  Int    @default(1)
+  serverVersion Int    @default(1)
+}
+
+model AnchorPoint {
+  id                        String   @id @default(cuid())
+  projectId                 String
+  project                   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  numeroPonto               String
+  localizacao               String
+  foto                      String?  @db.Text // base64 image
+  numeroLacre               String?
+  tipoEquipamento           String?
+  dataInstalacao            DateTime?
+  frequenciaInspecaoMeses   Int?
+  observacoes               String?  @db.Text
+  posicaoX                  Float
+  posicaoY                  Float
+  dataHora                  DateTime @default(now())
+  status                    String   @default("Não Testado") // 'Aprovado' | 'Reprovado' | 'Não Testado'
+  createdByUserId           String?
+  createdByUser             User?    @relation("CreatedPoints", fields: [createdByUserId], references: [id])
+  lastModifiedByUserId      String?
+  lastModifiedByUser        User?    @relation("ModifiedPoints", fields: [lastModifiedByUserId], references: [id])
+  archived                  Boolean  @default(false)
+  archivedAt                DateTime?
+  tests                     AnchorTest[]
+  
+  // Sync and versioning
+  syncStatus    String @default("synced") // "synced", "pending", "conflict"
+  localVersion  Int    @default(1)
+  serverVersion Int    @default(1)
+  lastSyncAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([projectId])
+  @@index([status])
+  @@index([archived])
+  @@index([syncStatus])
+}
+
+model AnchorTest {
+  id                String   @id @default(cuid())
+  pontoId           String
+  ponto             AnchorPoint @relation(fields: [pontoId], references: [id], onDelete: Cascade)
+  dataHora          DateTime @default(now())
+  resultado         String   // 'Aprovado' | 'Reprovado'
+  carga             String
+  tempo             String
+  tecnico           String
+  observacoes       String?  @db.Text
+  fotoTeste         String?  @db.Text // base64 image
+  fotoPronto        String?  @db.Text // base64 image
+  dataFotoPronto    DateTime?
+  createdByUserId   String?
+  createdByUser     User?    @relation(fields: [createdByUserId], references: [id])
+  
+  // Sync and versioning
+  syncStatus    String @default("synced") // "synced", "pending", "conflict"
+  localVersion  Int    @default(1)
+  serverVersion Int    @default(1)
+  lastSyncAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([pontoId])
+  @@index([resultado])
+  @@index([syncStatus])
+}
+
+// NOVO: Sistema de Auditoria
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String   // "Project", "AnchorPoint", "AnchorTest", "User", etc
+  entityId    String   // ID da entidade que foi modificada
+  action      String   // "CREATE", "UPDATE", "DELETE", "ARCHIVE"
+  oldValues   Json?    // Valores anteriores (para UPDATE)
+  newValues   Json     // Valores novos
+  changes     Json?    // Diff das mudanças
+  userId      String?  // Quem fez a alteração
+  user        User?    @relation(fields: [userId], references: [id])
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  timestamp   DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  
+  // Metadados adicionais
+  metadata    Json?    // Informações extras sobre a operação
+  
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([companyId])
+  @@index([timestamp])
+  @@index([action])
+}
+
+// NOVO: Controle de Sincronização
+model SyncStatus {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  lastSyncAt      DateTime?
+  pendingChanges  Int      @default(0)
+  conflictCount   Int      @default(0)
+  status          String   @default("idle") // "idle", "syncing", "error"
+  errorMessage    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

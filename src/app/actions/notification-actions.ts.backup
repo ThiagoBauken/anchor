@@ -1,0 +1,551 @@
+'use server';
+
+import { NotificationSettings, NotificationLog } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import nodemailer from 'nodemailer';
+
+// ===== NOTIFICATION SETTINGS =====
+
+/**
+ * Get notification settings for a company
+ */
+export async function getNotificationSettings(companyId: string): Promise<NotificationSettings | null> {
+  try {
+    if (!prisma) return null;
+
+    const settings = await prisma.notificationSettings.findUnique({
+      where: { companyId },
+      include: {
+        company: true
+      }
+    });
+
+    return settings;
+  } catch (error) {
+    console.error('Error fetching notification settings:', error);
+    return null;
+  }
+}
+
+/**
+ * Create or update notification settings for a company
+ */
+export async function updateNotificationSettings(
+  companyId: string,
+  data: {
+    emailEnabled?: boolean;
+    adminEmails?: string[];
+    notifyOnTestFail?: boolean;
+    notifyOnInspectionDue?: boolean;
+    notifyOnPublicReport?: boolean;
+    daysBeforeInspection?: number;
+    dailyDigestEnabled?: boolean;
+    weeklyReportEnabled?: boolean;
+  }
+): Promise<NotificationSettings | null> {
+  console.log('[DEBUG] updateNotificationSettings called:', { companyId });
+
+  try {
+    if (!prisma) return null;
+
+    // Check if settings exist
+    const existing = await prisma.notificationSettings.findUnique({
+      where: { companyId }
+    });
+
+    if (existing) {
+      // Update existing settings - mapped to actual schema fields
+      const updateData: any = {};
+      if (data.emailEnabled !== undefined) updateData.emailNotifications = data.emailEnabled;
+      if (data.notifyOnTestFail !== undefined) updateData.failedTestAlerts = data.notifyOnTestFail;
+      if (data.notifyOnInspectionDue !== undefined) updateData.inspectionReminders = data.notifyOnInspectionDue;
+      if (data.daysBeforeInspection !== undefined) updateData.reminderDays = [data.daysBeforeInspection];
+      if (data.weeklyReportEnabled !== undefined) updateData.weeklyDigest = data.weeklyReportEnabled;
+
+      const updated = await prisma.notificationSettings.update({
+        where: { companyId },
+        data: updateData,
+        include: {
+          company: true
+        }
+      });
+
+      console.log('[DEBUG] Notification settings updated');
+      return updated;
+    }
+
+    // Create new settings - mapped to actual schema fields
+    const newSettings = await prisma.notificationSettings.create({
+      data: {
+        companyId,
+        emailNotifications: data.emailEnabled ?? true,
+        inspectionReminders: data.notifyOnInspectionDue ?? true,
+        failedTestAlerts: data.notifyOnTestFail ?? true,
+        weeklyDigest: data.weeklyReportEnabled ?? true,
+        reminderDays: data.daysBeforeInspection ? [data.daysBeforeInspection] : [30, 15, 7],
+      },
+      include: {
+        company: true
+      }
+    });
+
+    console.log('[DEBUG] Notification settings created:', newSettings.id);
+    return newSettings;
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+    return null;
+  }
+}
+
+// ===== EMAIL SENDING =====
+
+/**
+ * Create email transporter using environment variables
+ */
+function createEmailTransporter() {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPassword = process.env.SMTP_PASSWORD;
+  const smtpFromEmail = process.env.SMTP_FROM_EMAIL || smtpUser;
+
+  if (!smtpHost || !smtpUser || !smtpPassword) {
+    console.warn('SMTP credentials not configured. Email notifications disabled.');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPassword,
+    },
+  });
+}
+
+/**
+ * Send an email notification
+ */
+async function sendEmail(
+  to: string[],
+  subject: string,
+  htmlContent: string,
+  textContent?: string
+): Promise<boolean> {
+  try {
+    const transporter = createEmailTransporter();
+    if (!transporter) {
+      console.warn('Email transporter not available');
+      return false;
+    }
+
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+    const fromName = process.env.SMTP_FROM_NAME || 'AnchorView';
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: to.join(', '),
+      subject,
+      text: textContent || htmlContent.replace(/<[^>]*>/g, ''),
+      html: htmlContent,
+    });
+
+    console.log('[DEBUG] Email sent successfully to:', to.join(', '));
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return false;
+  }
+}
+
+/**
+ * Log a notification
+ */
+async function logNotification(
+  companyId: string,
+  type: string,
+  recipient: string,
+  subject: string,
+  success: boolean,
+  metadata?: any
+): Promise<void> {
+  try {
+    if (!prisma) return;
+
+    await prisma.notificationLog.create({
+      data: {
+        type,
+        recipient,
+        subject,
+        body: metadata ? JSON.stringify(metadata) : undefined,
+        status: success ? 'sent' : 'failed',
+      }
+    });
+  } catch (error) {
+    console.error('Error logging notification:', error);
+  }
+}
+
+// ===== NOTIFICATION TYPES =====
+
+/**
+ * Send notification when a test fails
+ */
+export async function notifyTestFailed(
+  companyId: string,
+  projectName: string,
+  anchorPointNumber: string,
+  testDetails: {
+    carga: string;
+    tempo: string;
+    tecnico: string;
+    observacoes?: string;
+  }
+): Promise<boolean> {
+  console.log('[DEBUG] notifyTestFailed called:', { companyId, projectName, anchorPointNumber });
+
+  try {
+    const settings = await getNotificationSettings(companyId);
+    if (!settings || !settings.emailNotifications || !settings.failedTestAlerts) {
+      console.log('[DEBUG] Test fail notifications disabled');
+      return false;
+    }
+
+    if (![] || [].length === 0) {
+      console.warn('[WARN] No admin emails configured');
+      return false;
+    }
+
+    const subject = `⚠️ Teste Reprovado - ${projectName} - Ponto ${anchorPointNumber}`;
+    const htmlContent = `
+      <h2>Teste de Ancoragem Reprovado</h2>
+      <p>Um ponto de ancoragem foi reprovado no teste de carga.</p>
+      <h3>Detalhes:</h3>
+      <ul>
+        <li><strong>Projeto:</strong> ${projectName}</li>
+        <li><strong>Ponto:</strong> ${anchorPointNumber}</li>
+        <li><strong>Carga Aplicada:</strong> ${testDetails.carga}</li>
+        <li><strong>Tempo de Teste:</strong> ${testDetails.tempo}</li>
+        <li><strong>Técnico Responsável:</strong> ${testDetails.tecnico}</li>
+        ${testDetails.observacoes ? `<li><strong>Observações:</strong> ${testDetails.observacoes}</li>` : ''}
+      </ul>
+      <p><em>Acesse o AnchorView para mais detalhes e tomar ações corretivas.</em></p>
+    `;
+
+    const success = await sendEmail([], subject, htmlContent);
+    await logNotification(companyId, 'test_failed', [].join(','), subject, success, {
+      projectName,
+      anchorPointNumber,
+      testDetails
+    });
+
+    return success;
+  } catch (error) {
+    console.error('Error sending test failed notification:', error);
+    return false;
+  }
+}
+
+/**
+ * Send notification when inspection is due soon
+ */
+export async function notifyInspectionDue(
+  companyId: string,
+  projectName: string,
+  anchorPoints: Array<{
+    numeroPonto: string;
+    nextInspectionDate?: string;
+    daysRemaining: number;
+  }>
+): Promise<boolean> {
+  console.log('[DEBUG] notifyInspectionDue called:', { companyId, projectName, pointsCount: anchorPoints.length });
+
+  try {
+    const settings = await getNotificationSettings(companyId);
+    if (!settings || !settings.emailNotifications || !settings.inspectionReminders) {
+      console.log('[DEBUG] Inspection due notifications disabled');
+      return false;
+    }
+
+    if (![] || [].length === 0) {
+      console.warn('[WARN] No admin emails configured');
+      return false;
+    }
+
+    const subject = `📅 Inspeções Vencendo - ${projectName} (${anchorPoints.length} pontos)`;
+
+    const pointsList = anchorPoints.map(p =>
+      `<li>Ponto ${p.numeroPonto} - ${p.daysRemaining} dias restantes</li>`
+    ).join('');
+
+    const htmlContent = `
+      <h2>Inspeções de Ancoragem Vencendo</h2>
+      <p>Os seguintes pontos de ancoragem precisam de inspeção em breve:</p>
+      <h3>Projeto: ${projectName}</h3>
+      <ul>
+        ${pointsList}
+      </ul>
+      <p><em>Acesse o AnchorView para agendar as inspeções.</em></p>
+    `;
+
+    const success = await sendEmail([], subject, htmlContent);
+    await logNotification(companyId, 'inspection_due', [].join(','), subject, success, {
+      projectName,
+      pointsCount: anchorPoints.length
+    });
+
+    return success;
+  } catch (error) {
+    console.error('Error sending inspection due notification:', error);
+    return false;
+  }
+}
+
+/**
+ * Send notification when a public problem report is submitted
+ */
+export async function notifyPublicReport(
+  companyId: string,
+  projectName: string,
+  report: {
+    anchorPointNumber?: string;
+    description: string;
+    priority: string;
+    contactEmail?: string;
+  }
+): Promise<boolean> {
+  console.log('[DEBUG] notifyPublicReport called:', { companyId, projectName });
+
+  try {
+    const settings = await getNotificationSettings(companyId);
+    if (!settings || !settings.emailNotifications || !false) {
+      console.log('[DEBUG] Public report notifications disabled');
+      return false;
+    }
+
+    if (![] || [].length === 0) {
+      console.warn('[WARN] No admin emails configured');
+      return false;
+    }
+
+    const priorityEmoji = {
+      low: 'ℹ️',
+      medium: '⚠️',
+      high: '🔴',
+      urgent: '🚨'
+    }[report.priority] || '⚠️';
+
+    const subject = `${priorityEmoji} Reporte Público - ${projectName}${report.anchorPointNumber ? ` - Ponto ${report.anchorPointNumber}` : ''}`;
+
+    const htmlContent = `
+      <h2>Novo Reporte Público Recebido</h2>
+      <p>Um usuário reportou um problema através da visualização pública.</p>
+      <h3>Detalhes:</h3>
+      <ul>
+        <li><strong>Projeto:</strong> ${projectName}</li>
+        ${report.anchorPointNumber ? `<li><strong>Ponto:</strong> ${report.anchorPointNumber}</li>` : ''}
+        <li><strong>Prioridade:</strong> ${report.priority.toUpperCase()}</li>
+        <li><strong>Descrição:</strong> ${report.description}</li>
+        ${report.contactEmail ? `<li><strong>Email de Contato:</strong> ${report.contactEmail}</li>` : ''}
+      </ul>
+      <p><em>Acesse o AnchorView para revisar e responder ao reporte.</em></p>
+    `;
+
+    const success = await sendEmail([], subject, htmlContent);
+    await logNotification(companyId, 'public_report', [].join(','), subject, success, {
+      projectName,
+      report
+    });
+
+    return success;
+  } catch (error) {
+    console.error('Error sending public report notification:', error);
+    return false;
+  }
+}
+
+/**
+ * Send daily digest email with summary of activities
+ */
+export async function sendDailyDigest(companyId: string): Promise<boolean> {
+  console.log('[DEBUG] sendDailyDigest called:', { companyId });
+
+  try {
+    const settings = await getNotificationSettings(companyId);
+    if (!settings || !settings.emailNotifications || !false) {
+      console.log('[DEBUG] Daily digest disabled');
+      return false;
+    }
+
+    if (![] || [].length === 0) {
+      console.warn('[WARN] No admin emails configured');
+      return false;
+    }
+
+    // TODO: Fetch today's activity data from database
+    // This is a placeholder implementation
+
+    const subject = `📊 Resumo Diário - AnchorView`;
+    const htmlContent = `
+      <h2>Resumo das Atividades de Hoje</h2>
+      <p><em>Este é um resumo automático das atividades no AnchorView.</em></p>
+      <h3>Estatísticas:</h3>
+      <ul>
+        <li>Testes realizados: [TODO]</li>
+        <li>Pontos criados: [TODO]</li>
+        <li>Visualizações públicas: [TODO]</li>
+        <li>Reportes recebidos: [TODO]</li>
+      </ul>
+      <p><em>Acesse o AnchorView para detalhes completos.</em></p>
+    `;
+
+    const success = await sendEmail([], subject, htmlContent);
+    await logNotification(companyId, 'daily_digest', [].join(','), subject, success);
+
+    return success;
+  } catch (error) {
+    console.error('Error sending daily digest:', error);
+    return false;
+  }
+}
+
+/**
+ * Send weekly report email
+ */
+export async function sendWeeklyReport(companyId: string): Promise<boolean> {
+  console.log('[DEBUG] sendWeeklyReport called:', { companyId });
+
+  try {
+    const settings = await getNotificationSettings(companyId);
+    if (!settings || !settings.emailNotifications || !settings.weeklyDigest) {
+      console.log('[DEBUG] Weekly report disabled');
+      return false;
+    }
+
+    if (![] || [].length === 0) {
+      console.warn('[WARN] No admin emails configured');
+      return false;
+    }
+
+    // TODO: Fetch week's activity data from database
+    // This is a placeholder implementation
+
+    const subject = `📈 Relatório Semanal - AnchorView`;
+    const htmlContent = `
+      <h2>Relatório Semanal de Atividades</h2>
+      <p><em>Resumo das últimas 7 dias no AnchorView.</em></p>
+      <h3>Estatísticas da Semana:</h3>
+      <ul>
+        <li>Total de testes: [TODO]</li>
+        <li>Taxa de aprovação: [TODO]%</li>
+        <li>Novos pontos: [TODO]</li>
+        <li>Visualizações públicas: [TODO]</li>
+        <li>Reportes recebidos: [TODO]</li>
+      </ul>
+      <h3>Ações Necessárias:</h3>
+      <ul>
+        <li>Inspeções vencendo: [TODO]</li>
+        <li>Reportes pendentes: [TODO]</li>
+      </ul>
+      <p><em>Acesse o AnchorView para análise completa.</em></p>
+    `;
+
+    const success = await sendEmail([], subject, htmlContent);
+    await logNotification(companyId, 'weekly_report', [].join(','), subject, success);
+
+    return success;
+  } catch (error) {
+    console.error('Error sending weekly report:', error);
+    return false;
+  }
+}
+
+// ===== NOTIFICATION LOGS =====
+
+/**
+ * Get notification logs for a company
+ */
+export async function getNotificationLogs(
+  companyId: string,
+  limit: number = 100,
+  type?: string
+): Promise<NotificationLog[]> {
+  try {
+    if (!prisma) return [];
+
+    const logs = await prisma.notificationLog.findMany({
+      where: {
+        companyId,
+        ...(type && { type })
+      },
+      orderBy: { sentAt: 'desc' },
+      take: limit
+    });
+
+    return logs;
+  } catch (error) {
+    console.error('Error fetching notification logs:', error);
+    return [];
+  }
+}
+
+/**
+ * Get notification statistics for a company
+ */
+export async function getNotificationStats(companyId: string): Promise<{
+  total: number;
+  sent: number;
+  failed: number;
+  byType: { [key: string]: number };
+  last24Hours: number;
+}> {
+  try {
+    if (!prisma) {
+      return {
+        total: 0,
+        sent: 0,
+        failed: 0,
+        byType: {},
+        last24Hours: 0
+      };
+    }
+
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [total, sent, failed, recent, allLogs] = await Promise.all([
+      prisma.notificationLog.count({ where: { companyId } }),
+      prisma.notificationLog.count({ where: { companyId, status: 'sent' } }),
+      prisma.notificationLog.count({ where: { companyId, status: 'failed' } }),
+      prisma.notificationLog.count({ where: { companyId, sentAt: { gte: last24h } } }),
+      prisma.notificationLog.findMany({
+        where: { companyId },
+        select: { type: true }
+      })
+    ]);
+
+    // Count by type
+    const byType: { [key: string]: number } = {};
+    allLogs.forEach(log => {
+      byType[log.type] = (byType[log.type] || 0) + 1;
+    });
+
+    return {
+      total,
+      sent,
+      failed,
+      byType,
+      last24Hours: recent
+    };
+  } catch (error) {
+    console.error('Error fetching notification stats:', error);
+    return {
+      total: 0,
+      sent: 0,
+      failed: 0,
+      byType: {},
+      last24Hours: 0
+    };
+  }
+}

@@ -1,0 +1,1081 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  superadmin      // Dono do sistema - acesso total
+  company_admin   // Administradoras/Condomínios - gerenciam projetos e equipes
+  team_admin      // Líder da equipe de alpinismo - edita mapas dos projetos atribuídos
+  technician      // Técnico de campo - apenas realiza testes
+}
+
+model Company {
+  id                      String @id @default(cuid())
+  name                    String
+  email                   String?
+  phone                   String?
+  address                 String?
+  cnpj                    String?
+  
+  // Subscription fields
+  subscriptionPlan        String?
+  subscriptionStatus      String?
+  trialStartDate          DateTime?
+  trialEndDate            DateTime?
+  subscriptionExpiryDate  DateTime?
+  isTrialActive           Boolean @default(false)
+  daysRemainingInTrial    Int?
+  
+  // Usage and limits
+  usersCount              Int @default(0)
+  projectsCount           Int @default(0)
+  pointsCount             Int @default(0)
+  storageUsed             Int @default(0) // MB
+  maxUsers                Int?
+  maxProjects             Int?
+  maxStorage              Int? // MB
+  
+  // Admin fields
+  createdAt               DateTime @default(now())
+  lastActivity            DateTime?
+  isActive                Boolean @default(true)
+  notes                   String?
+
+  // Relations
+  users           User[]
+  locations       Location[]
+  projects        Project[]
+  files           File[]
+  syncQueue       SyncQueue[]
+  subscriptions   Subscription[]
+  userInvitations UserInvitation[]
+  usageLimits     UsageLimits?
+  companySettings CompanySettings?
+  saasActivityLog SaasActivityLog[]
+  backupRecords   BackupRecord[]
+  usageAnalytics  UsageAnalytics[]
+  subscriptionHistory SubscriptionHistory[]
+  teams           Team[]
+  notificationSettings NotificationSettings?
+  pathologyCategories PathologyCategory[]
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String?   @unique
+  password      String
+  role          UserRole  @default(technician)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLogin     DateTime? @map("last_login_at")
+  phone         String?
+  companyId     String
+
+  // Relations
+  company                    Company         @relation(fields: [companyId], references: [id])
+  createdProjects           Project[]       @relation("CreatedByUser")
+  createdAnchorPoints       AnchorPoint[]   @relation("CreatedByUser")
+  lastModifiedAnchorPoints  AnchorPoint[]   @relation("LastModifiedByUser")
+  files                     File[]
+  syncQueue                 SyncQueue[]
+  userSessions              UserSession[]
+  passwordResets            PasswordReset[]
+  auditLogs                 AuditLog[]
+  syncStatuses              SyncStatus[]
+  notifications             Notification[]
+  userPreferences           UserPreferences?
+  systemLogs                SystemLog[]
+  saasActivityLogs          SaasActivityLog[]
+  userPermissions           UserPermission[]
+  grantedPermissions        UserPermission[] @relation("GrantedPermissions")
+  subscriptionHistoryAdmin  SubscriptionHistory[] @relation("SubscriptionHistoryAdmin")
+  teamMemberships           TeamMember[]
+  createdFacadeInspections  FacadeInspection[]
+  engineerFacadeInspections FacadeInspection[] @relation("InspectionEngineer")
+  createdPathologyMarkers   PathologyMarker[]
+  engineerReports           InspectionReport[] @relation("ReportEngineer")
+  approvedReports           InspectionReport[] @relation("ReportApprover")
+}
+
+model Location {
+  id          String @id @default(cuid())
+  name        String
+  markerShape String
+  markerColor String?
+  companyId   String
+  projectId   String? @map("project_id") // ✅ CADA PROJETO TEM SUAS LOCALIZAÇÕES (opcional)
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id                           String   @id @default(cuid())
+  name                         String
+  floorPlanImages              String[]
+  deleted                      Boolean  @default(false)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  companyId                    String
+  createdByUserId              String
+  obraAddress                  String?
+  obraCEP                      String?
+  obraCNPJ                     String?
+  contratanteName              String?
+  contratanteAddress           String?
+  contratanteCEP               String?
+  cnpjContratado               String?
+  contato                      String?
+  valorContrato                String?
+  dataInicio                   String?
+  dataTermino                  String?
+  responsavelTecnico           String?
+  registroCREA                 String?
+  tituloProfissional           String?
+  numeroART                    String?
+  rnp                          String?
+  cargaDeTestePadrao           String?
+  tempoDeTestePadrao           String?
+  engenheiroResponsavelPadrao  String?
+  dispositivoDeAncoragemPadrao String?
+
+  // Relations
+  company      Company       @relation(fields: [companyId], references: [id])
+  createdBy    User          @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  anchorPoints AnchorPoint[]
+  locations    Location[]    // ✅ PROJETO TEM SUAS PRÓPRIAS LOCALIZAÇÕES
+  teamPermissions  ProjectTeamPermission[]
+  publicSettings   ProjectPublicSettings?
+  photos       Photo[]
+  floorPlans   FloorPlan[]   // ✅ MÚLTIPLAS PLANTAS BAIXAS
+  facadeInspections FacadeInspection[] // ✅ INSPEÇÕES DE FACHADA
+}
+
+model SubscriptionPlan {
+  id           String   @id
+  name         String
+  description  String?
+  priceMonthly Decimal  @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly  Decimal? @map("price_yearly") @db.Decimal(10, 2)
+  maxUsers     Int?     @map("max_users")
+  maxProjects  Int?     @map("max_projects")
+  maxPoints    Int?     @map("max_points")
+  maxStorageGb Int?     @default(10) @map("max_storage_gb")
+  features     Json     @default("{}")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                String             @id @default(cuid())
+  companyId         String             @map("company_id")
+  planId            String             @map("plan_id")
+  status            SubscriptionStatus @default(trialing)
+  currentPeriodStart DateTime          @map("current_period_start")
+  currentPeriodEnd   DateTime          @map("current_period_end")
+  trialStart        DateTime?          @map("trial_start")
+  trialEnd          DateTime?          @map("trial_end")
+  cancelAt          DateTime?          @map("cancel_at")
+  canceledAt        DateTime?          @map("canceled_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  company  Company          @relation(fields: [companyId], references: [id])
+  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  subscriptionId   String        @map("subscription_id")
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("BRL")
+  status           PaymentStatus @default(pending)
+  paymentMethod    String        @map("payment_method")
+  externalId       String?       @map("external_id")
+  externalData     Json?         @map("external_data")
+  paidAt           DateTime?     @map("paid_at")
+  failedAt         DateTime?     @map("failed_at")
+  refundedAt       DateTime?     @map("refunded_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+  trialing
+}
+
+enum PaymentStatus {
+  paid
+  pending
+  failed
+  refunded
+}
+
+model AnchorPoint {
+  id                        String    @id @default(cuid())
+  projectId                 String    @map("project_id")
+  floorPlanId               String?   @map("floor_plan_id")
+  numeroPonto               String    @map("numero_ponto")
+  localizacao               String
+  foto                      String?
+  numeroLacre               String?   @map("numeroLacre")
+  tipoEquipamento           String?   @map("tipo_equipamento")
+  dataInstalacao            String?   @map("data_instalacao")
+  frequenciaInspecaoMeses   Int?      @map("frequencia_inspecao_meses")
+  observacoes               String?
+  posicaoX                  Float     @map("posicao_x")
+  posicaoY                  Float     @map("posicao_y")
+  dataHora                  DateTime  @default(now()) @map("data_hora")
+  status                    String    @default("Não Testado")
+  createdByUserId           String?   @map("created_by_user_id")
+  lastModifiedByUserId      String?   @map("last_modified_by_user_id")
+  archived                  Boolean   @default(false)
+  archivedAt                DateTime? @map("archived_at")
+
+  // Relations
+  project            Project      @relation(fields: [projectId], references: [id])
+  floorPlan          FloorPlan?   @relation(fields: [floorPlanId], references: [id])
+  createdBy          User?        @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  lastModifiedBy     User?        @relation("LastModifiedByUser", fields: [lastModifiedByUserId], references: [id])
+  anchorTests        AnchorTest[]
+  photos             Photo[]
+
+  @@map("anchor_points")
+}
+
+model AnchorTest {
+  id            String   @id @default(cuid())
+  pontoId       String   @map("ponto_id")
+  dataHora      DateTime @default(now()) @map("data_hora")
+  resultado     String
+  carga         String
+  tempo         String
+  tecnico       String
+  observacoes   String?
+  fotoTeste     String?  @map("foto_teste")
+  fotoPronto    String?  @map("foto_pronto")
+  dataFotoPronto String? @map("data_foto_pronto")
+
+  // Relations
+  anchorPoint AnchorPoint @relation(fields: [pontoId], references: [id])
+
+  @@map("anchor_tests")
+}
+
+// ===== PLANTAS BAIXAS (FLOOR PLANS) =====
+
+model FloorPlan {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  image       String   @db.Text
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  anchorPoints AnchorPoint[]
+
+  @@map("floor_plans")
+  @@index([projectId])
+}
+
+model Photo {
+  id                String    @id @default(cuid())
+  fileName          String    @map("file_name")
+  filePath          String?   @map("file_path")
+  publicUrl         String?   @map("public_url")
+
+  // Relacionamentos
+  projectId         String    @map("project_id")
+  pontoId           String    @map("ponto_id")
+
+  // Metadados
+  pontoNumero       String    @map("ponto_numero")
+  pontoLocalizacao  String    @map("ponto_localizacao")
+  type              String    // 'ponto', 'teste', 'teste-final'
+
+  // Timestamps
+  capturedAt        DateTime  @map("captured_at")
+  uploadedAt        DateTime? @map("uploaded_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  // Sync
+  uploaded          Boolean   @default(false)
+  fileSize          Int?      @map("file_size")
+
+  // Relations
+  project           Project      @relation(fields: [projectId], references: [id])
+  anchorPoint       AnchorPoint  @relation(fields: [pontoId], references: [id])
+
+  @@map("photos")
+  @@index([projectId])
+  @@index([pontoId])
+  @@index([uploaded])
+}
+
+model File {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  url          String?
+  uploaded     Boolean  @default(false)
+  companyId    String   @map("company_id")
+  userId       String?  @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@map("files")
+}
+
+model SyncQueue {
+  id        String    @id @default(cuid())
+  operation String
+  tableName String    @map("table_name")
+  recordId  String    @map("record_id")
+  data      Json
+  status    String    @default("pending")
+  retries   Int       @default(0)
+  error     String?
+  companyId String    @map("company_id")
+  userId    String?   @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  syncedAt  DateTime? @map("synced_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@map("sync_queue")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  sessionToken String   @unique @map("session_token")
+  refreshToken String   @unique @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  ipAddress    String   @map("ip_address")
+  userAgent    String   @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model UserInvitation {
+  id        String    @id @default(cuid())
+  companyId String    @map("company_id")
+  email     String
+  role      UserRole
+  invitedBy String    @map("invited_by")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("user_invitations")
+}
+
+model UsageLimits {
+  id             String  @id @default(cuid())
+  companyId      String  @unique @map("company_id")
+  usersCount     Int     @default(0) @map("users_count")
+  projectsCount  Int     @default(0) @map("projects_count")
+  pointsCount    Int     @default(0) @map("points_count")
+  storageUsedGb  Decimal @default(0) @map("storage_used_gb") @db.Decimal(10, 2)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("usage_limits")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("password_resets")
+}
+
+model AuditLog {
+  id             String    @id @default(cuid())
+  tableName      String    @map("table_name")
+  recordId       String    @map("record_id")
+  operation      String    // INSERT, UPDATE, DELETE
+  oldValues      Json?     @map("old_values")
+  newValues      Json?     @map("new_values")
+  changedFields  String[]  @map("changed_fields")
+  userId         String?   @map("user_id")
+  sessionId      String?   @map("session_id")
+  timestamp      DateTime  @default(now())
+  ipAddress      String?   @map("ip_address")
+  userAgent      String?   @map("user_agent")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
+
+model SyncStatus {
+  id          String   @id @default(cuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  userId      String   @map("user_id")
+  deviceId    String   @map("device_id")
+  syncStatus  String   @map("sync_status") // pending, syncing, synced, error
+  retryCount  Int      @default(0) @map("retry_count")
+  lastError   String?  @map("last_error")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("sync_status")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  title     String
+  message   String
+  type      String    // info, warning, error, success
+  data      Json?
+  readAt    DateTime? @map("read_at")
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model UserPreferences {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  preferences Json     @default("{}")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_preferences")
+}
+
+model CompanySettings {
+  id        String   @id @default(cuid())
+  companyId String   @unique @map("company_id")
+  settings  Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("company_settings")
+}
+
+model SystemLog {
+  id        String    @id @default(cuid())
+  level     String    // debug, info, warn, error
+  category  String
+  message   String
+  context   Json?
+  userId    String?   @map("user_id")
+  sessionId String?   @map("session_id")
+  timestamp DateTime  @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("system_logs")
+}
+
+model SaasActivityLog {
+  id           String   @id @default(cuid())
+  companyId    String   @map("company_id")
+  userId       String?  @map("user_id")
+  activityType String   @map("activity_type")
+  description  String
+  metadata     Json?
+  timestamp    DateTime @default(now())
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@map("saas_activity_log")
+}
+
+model UserPermission {
+  id           String  @id @default(cuid())
+  userId       String  @map("user_id")
+  permission   String
+  resourceType String? @map("resource_type")
+  resourceId   String? @map("resource_id")
+  grantedBy    String  @map("granted_by")
+  grantedAt    DateTime @default(now()) @map("granted_at")
+  expiresAt    DateTime? @map("expires_at")
+
+  // Relations
+  user      User @relation(fields: [userId], references: [id])
+  grantedByUser User @relation("GrantedPermissions", fields: [grantedBy], references: [id])
+
+  @@map("user_permissions")
+}
+
+// ===== NOVOS MODELS PARA SISTEMA COMPLETO =====
+
+model BackupConfig {
+  id               String   @id @default(cuid())
+  enabled          Boolean  @default(true)
+  frequency        String   // 'daily', 'weekly', 'monthly'
+  retentionDays    Int      @default(30) @map("retention_days")
+  includeFiles     Boolean  @default(true) @map("include_files")
+  compressBackups  Boolean  @default(true) @map("compress_backups")
+  encryptBackups   Boolean  @default(false) @map("encrypt_backups")
+  backupPath       String   @map("backup_path")
+  lastBackup       DateTime? @map("last_backup")
+  nextBackup       DateTime? @map("next_backup")
+  backupSize       Int?     @map("backup_size") // MB
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("backup_config")
+}
+
+model BackupRecord {
+  id               String   @id @default(cuid())
+  timestamp        DateTime @default(now())
+  type             String   // 'automatic', 'manual'
+  status           String   // 'completed', 'failed', 'in_progress'
+  size             Int      // MB
+  duration         Int      // seconds
+  error            String?
+  tablesBackedUp   String[] @map("tables_backed_up")
+  filesCount       Int      @default(0) @map("files_count")
+  companyId        String?  @map("company_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@map("backup_records")
+}
+
+model UsageAnalytics {
+  id               String   @id @default(cuid())
+  companyId        String   @map("company_id")
+  date             String   // YYYY-MM-DD
+  activeUsers      Int      @default(0) @map("active_users")
+  projectsCreated  Int      @default(0) @map("projects_created")
+  pointsCreated    Int      @default(0) @map("points_created")
+  testsPerformed   Int      @default(0) @map("tests_performed")
+  photosUploaded   Int      @default(0) @map("photos_uploaded")
+  storageUsed      Int      @default(0) @map("storage_used") // MB
+  syncOperations   Int      @default(0) @map("sync_operations")
+  loginCount       Int      @default(0) @map("login_count")
+  sessionDuration  Int      @default(0) @map("session_duration") // minutes
+  topFeatures      String[] @map("top_features")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, date])
+  @@map("usage_analytics")
+}
+
+model SystemHealth {
+  id               String   @id @default(cuid())
+  timestamp        DateTime @default(now())
+  status           String   // 'healthy', 'warning', 'critical'
+  databaseStatus   String   @map("database_status") // 'online', 'offline', 'slow'
+  storageStatus    String   @map("storage_status") // 'online', 'offline', 'full'
+  syncStatus       String   @map("sync_status") // 'active', 'inactive', 'overloaded'
+  backupStatus     String   @map("backup_status") // 'current', 'outdated', 'failed'
+  responseTime     Int      @map("response_time") // ms
+  cpuUsage         Int      @map("cpu_usage") // %
+  memoryUsage      Int      @map("memory_usage") // %
+  diskUsage        Int      @map("disk_usage") // %
+  activeConnections Int     @map("active_connections")
+  queueLength      Int      @map("queue_length")
+  alerts           String[]
+
+  @@map("system_health")
+}
+
+model SubscriptionHistory {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  planId         String   @map("plan_id")
+  action         String   // 'subscribe', 'upgrade', 'downgrade', 'cancel', 'renew', 'suspend'
+  previousPlan   String?  @map("previous_plan")
+  newPlan        String?  @map("new_plan")
+  effectiveDate  DateTime @map("effective_date")
+  amount         Decimal? @db.Decimal(10, 2)
+  paymentMethod  String?  @map("payment_method")
+  adminId        String   @map("admin_id")
+  reason         String?
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company Company @relation(fields: [companyId], references: [id])
+  admin   User    @relation("SubscriptionHistoryAdmin", fields: [adminId], references: [id])
+
+  @@map("subscription_history")
+}
+
+model Permission {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String
+  category     String   // 'system', 'company', 'project', 'point', 'test'
+  actions      String[] // ['read', 'write', 'delete', 'admin']
+  ownDataOnly  Boolean  @default(false) @map("own_data_only")
+  companyDataOnly Boolean @default(true) @map("company_data_only")
+  timeRestricted Boolean @default(false) @map("time_restricted")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("permissions")
+}
+
+// ===== SISTEMA DE EQUIPES (TEAMS) =====
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  companyId   String   @map("company_id")
+
+  // Informações da equipe
+  cnpj        String?
+  email       String?
+  phone       String?
+  address     String?
+  logo        String?  @db.Text
+  website     String?
+
+  // Certificações e seguros
+  certifications     String[]
+  insurancePolicy    String?       @map("insurance_policy")
+  insuranceExpiry    DateTime?     @map("insurance_expiry")
+  insuranceValue     Decimal?      @map("insurance_value") @db.Decimal(12, 2)
+
+  // Contato do responsável
+  managerName        String?       @map("manager_name")
+  managerPhone       String?       @map("manager_phone")
+  managerEmail       String?       @map("manager_email")
+
+  // Status
+  active      Boolean  @default(true)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  company             Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members             TeamMember[]
+  projectPermissions  ProjectTeamPermission[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  role      String   @default("technician") // "owner", "manager", "technician", "viewer"
+
+  // Status
+  active    Boolean  @default(true)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  // Relações
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model ProjectTeamPermission {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  teamId      String   @map("team_id")
+
+  // Permissões granulares
+  canView          Boolean @default(true)  @map("can_view")
+  canCreatePoints  Boolean @default(true)  @map("can_create_points")
+  canEditPoints    Boolean @default(true)  @map("can_edit_points")
+  canDeletePoints  Boolean @default(false) @map("can_delete_points")
+  canTestPoints    Boolean @default(true)  @map("can_test_points")
+  canExportReports Boolean @default(true)  @map("can_export_reports")
+  canViewMap       Boolean @default(true)  @map("can_view_map")
+
+  // Metadata
+  grantedBy   String   @map("granted_by") // userId do admin
+  grantedAt   DateTime @default(now()) @map("granted_at")
+  expiresAt   DateTime? @map("expires_at")
+  notes       String?   @db.Text
+
+  // Relações
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, teamId])
+  @@index([teamId])
+  @@index([projectId])
+  @@map("project_team_permissions")
+}
+
+// ===== VISUALIZAÇÃO PÚBLICA =====
+
+model ProjectPublicSettings {
+  id              String   @id @default(cuid())
+  projectId       String   @unique @map("project_id")
+  isPublic        Boolean  @default(false) @map("is_public")
+  publicToken     String   @unique @default(cuid()) @map("public_token")
+
+  // Configurações de visibilidade
+  showTestHistory      Boolean @default(true) @map("show_test_history")
+  showPhotos           Boolean @default(true) @map("show_photos")
+  showTechnicalData    Boolean @default(true) @map("show_technical_data")
+  showCompanyInfo      Boolean @default(true) @map("show_company_info")
+  showTeamInfo         Boolean @default(true) @map("show_team_info")
+  showLocation         Boolean @default(false) @map("show_location")
+  showContactInfo      Boolean @default(true) @map("show_contact_info")
+
+  // Mensagem customizada
+  welcomeMessage       String? @db.Text @map("welcome_message")
+  footerMessage        String? @db.Text @map("footer_message")
+
+  // Opções de interação
+  allowReportProblem   Boolean @default(true) @map("allow_report_problem")
+  reportEmail          String? @map("report_email")
+
+  // Analytics
+  totalViews           Int     @default(0) @map("total_views")
+  lastViewedAt         DateTime? @map("last_viewed_at")
+
+  // Metadata
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  createdBy            String?  @map("created_by")
+
+  // Relações
+  project              Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([publicToken])
+  @@map("project_public_settings")
+}
+
+model PublicViewLog {
+  id          String   @id @default(cuid())
+  token       String
+  viewedAt    DateTime @default(now()) @map("viewed_at")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @db.Text @map("user_agent")
+  referer     String?  @map("referer")
+
+  @@index([token])
+  @@index([viewedAt])
+  @@map("public_view_logs")
+}
+
+model PublicProblemReport {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  pointId     String?  @map("point_id")
+
+  // Dados do report
+  description String   @db.Text
+  reporterName String? @map("reporter_name")
+  reporterEmail String? @map("reporter_email")
+  reporterPhone String? @map("reporter_phone")
+
+  // Metadata
+  status      String   @default("pending") // pending, reviewing, resolved, dismissed
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+  resolvedAt  DateTime? @map("resolved_at")
+  resolvedBy  String?  @map("resolved_by")
+  resolution  String?  @db.Text
+
+  @@index([projectId])
+  @@index([status])
+  @@map("public_problem_reports")
+}
+
+// ===== NOTIFICAÇÕES =====
+
+model NotificationSettings {
+  id                    String  @id @default(cuid())
+  companyId             String  @unique @map("company_id")
+
+  emailNotifications    Boolean @default(true) @map("email_notifications")
+  inspectionReminders   Boolean @default(true) @map("inspection_reminders")
+  reminderDays          Int[]   @default([30, 15, 7]) @map("reminder_days")
+  failedTestAlerts      Boolean @default(true) @map("failed_test_alerts")
+  weeklyDigest          Boolean @default(true) @map("weekly_digest")
+  digestDay             Int     @default(1) @map("digest_day") // 1 = Monday
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  company               Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+model NotificationLog {
+  id          String   @id @default(cuid())
+  type        String   // "inspection_reminder", "test_failed", "weekly_digest"
+  recipient   String   // email
+  subject     String
+  body        String?  @db.Text
+  sentAt      DateTime @default(now()) @map("sent_at")
+  status      String   // "sent", "failed"
+  error       String?  @db.Text
+
+  @@index([sentAt])
+  @@index([type])
+  @@map("notification_logs")
+}
+
+// ===== INSPEÇÃO DE FACHADAS (FACADE INSPECTION) =====
+
+enum FacadeSideType {
+  NORTH    // Norte
+  SOUTH    // Sul
+  EAST     // Leste
+  WEST     // Oeste
+  ROOF     // Cobertura
+  OTHER    // Outro
+}
+
+enum InspectionStatus {
+  SCHEDULED   // Agendada
+  IN_PROGRESS // Em andamento
+  COMPLETED   // Concluída
+  APPROVED    // Aprovada
+  REJECTED    // Rejeitada
+}
+
+enum PathologySeverity {
+  LOW      // Baixa
+  MEDIUM   // Média
+  HIGH     // Alta
+  CRITICAL // Crítica
+}
+
+model FacadeInspection {
+  id                String            @id @default(cuid())
+  projectId         String            @map("project_id")
+  name              String            // "Inspeção Semestral 2025-01"
+  description       String?           @db.Text
+  status            InspectionStatus  @default(SCHEDULED)
+  scheduledDate     DateTime?         @map("scheduled_date")
+  startedAt         DateTime?         @map("started_at")
+  completedAt       DateTime?         @map("completed_at")
+
+  // Responsável
+  inspectorId       String?           @map("inspector_id")
+  inspectorName     String?           @map("inspector_name")
+  engineerId        String?           @map("engineer_id") // Engenheiro responsável
+
+  // Metadata
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  createdByUserId   String            @map("created_by_user_id")
+
+  // Relations
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy         User              @relation(fields: [createdByUserId], references: [id])
+  engineer          User?             @relation("InspectionEngineer", fields: [engineerId], references: [id])
+  facadeSides       FacadeSide[]
+  reports           InspectionReport[]
+
+  @@map("facade_inspections")
+  @@index([projectId])
+  @@index([status])
+}
+
+model FacadeSide {
+  id                String            @id @default(cuid())
+  inspectionId      String            @map("inspection_id")
+  sideType          FacadeSideType    @map("side_type")
+  name              String
+
+  // Foto do drone
+  image             String            @db.Text // base64 data URL
+  dronePhotoDate    DateTime?         @map("drone_photo_date")
+  weather           String?
+  photographer      String?
+  notes             String?           @db.Text
+  imageWidth        Int?              @map("image_width")
+  imageHeight       Int?              @map("image_height")
+  order             Int               @default(0)
+
+  // Floor and Division configuration (defined before marking)
+  availableFloors   String[]          @default([]) @map("available_floors") // ex: ["1", "2"... "10"]
+  availableDivisions String[]         @default([]) @map("available_divisions") // ex: ["D1", "D2"... "D7"]
+
+  // Timestamps
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  inspection        FacadeInspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  pathologyMarkers  PathologyMarker[]
+
+  @@map("facade_sides")
+  @@index([inspectionId])
+}
+
+model PathologyCategory {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  name        String   // "Fissuras", "Infiltração", "Desplacamento"
+  color       String   // Hex color: "#FF0000"
+  description String?  @db.Text
+  severity    PathologySeverity @default(MEDIUM)
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  markers     PathologyMarker[]
+
+  @@map("pathology_categories")
+  @@index([companyId])
+}
+
+model PathologyMarker {
+  id                String             @id @default(cuid())
+  facadeSideId      String             @map("facade_side_id")
+  categoryId        String             @map("category_id")
+
+  // Geometria (polígono desenhado)
+  geometry          Json               // Array de pontos: [{x, y}, {x, y}, ...]
+  area              Float?             // Área calculada em m²
+
+  // Informações
+  floor             String?            // Andar onde está localizado (ex: "7", "10", "Térreo")
+  division          String?            // Divisão/área (ex: "D1", "D2"... "D7")
+  severity          PathologySeverity  @default(MEDIUM)
+  description       String?            @db.Text
+  observations      String?            @db.Text
+
+  // Status
+  status            String             @default("PENDING") // PENDING, FIXED, MONITORING
+  priority          Int                @default(0) // 0-10
+
+  // Photos específicas desta patologia
+  photos            String[]           // Array de base64/URLs
+
+  // Timestamps
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  createdByUserId   String?            @map("created_by_user_id")
+
+  // Relations
+  facadeSide        FacadeSide         @relation(fields: [facadeSideId], references: [id], onDelete: Cascade)
+  category          PathologyCategory  @relation(fields: [categoryId], references: [id])
+  createdBy         User?              @relation(fields: [createdByUserId], references: [id])
+
+  @@map("pathology_markers")
+  @@index([facadeSideId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model InspectionReport {
+  id                String            @id @default(cuid())
+  inspectionId      String            @map("inspection_id")
+  engineerId        String            @map("engineer_id")
+  reportNumber      String            @map("report_number") // Ex: LAUDO-2025-001
+  version           Int               @default(1) // Versionamento do laudo
+
+  // Laudo
+  title             String
+  content           String            @db.Text // Laudo completo em markdown/HTML
+  conclusion        String?           @db.Text
+  recommendations   String?           @db.Text
+
+  // Aprovação
+  status            String            @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  generatedAt       DateTime          @default(now()) @map("generated_at")
+  approvedAt        DateTime?         @map("approved_at")
+  approvedBy        String?           @map("approved_by")
+  rejectedAt        DateTime?         @map("rejected_at")
+  rejectionReason   String?           @db.Text @map("rejection_reason")
+
+  // Anexos
+  attachments       String[]          // URLs/base64 de documentos anexos
+  pdfUrl            String?           @map("pdf_url") // URL do PDF gerado
+
+  // Timestamps
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  inspection        FacadeInspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  engineer          User              @relation("ReportEngineer", fields: [engineerId], references: [id])
+  approver          User?             @relation("ReportApprover", fields: [approvedBy], references: [id])
+
+  @@map("inspection_reports")
+  @@index([inspectionId])
+  @@index([engineerId])
+  @@index([status])
+}
