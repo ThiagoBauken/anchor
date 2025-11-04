@@ -3,33 +3,34 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Copy package files
+# Copy package files and prisma schema
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (skip postinstall to avoid migration during build)
+RUN npm ci --ignore-scripts
+
+# Generate Prisma Client manually (without running migrations)
+RUN npx prisma generate
 
 # Rebuild the source code only when needed
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependencies from deps stage (includes Prisma Client)
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma Client
-RUN npx prisma generate
-
 # Build Next.js app with standalone output
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # Production image, copy all the files and run next
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -48,8 +49,8 @@ USER nextjs
 
 EXPOSE 9002
 
-ENV PORT 9002
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=9002
+ENV HOSTNAME="0.0.0.0"
 
 # Start the application
 CMD ["node", "server.js"]
