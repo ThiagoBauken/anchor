@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PointsTab } from "./points-tab";
 import { TestsTab } from "./tests-tab";
 import { MapTab } from "./map-tab";
-// import { FacadesTab } from "./facades-tab"; // TODO: Facade feature not in MVP
+import { FacadesTab } from "./facades-tab";
 import { ReportsTab } from "./reports-tab";
 import { UsersTab } from "./users-tab";
 import { ProjectsTab } from "./projects-tab";
@@ -185,11 +185,9 @@ function AnchorViewContent() {
         <TabsContent value="map" role="tabpanel" aria-labelledby="map-tab">
           {currentProject ? <MapTab /> : <ProjectNotSelected />}
         </TabsContent>
-        {/* TODO: Facade feature not in MVP - commented out
         <TabsContent value="facades" role="tabpanel" aria-labelledby="facades-tab">
           {currentProject ? <FacadesTab /> : <ProjectNotSelected />}
         </TabsContent>
-        */}
         <TabsContent value="points" role="tabpanel" aria-labelledby="points-tab">
           {currentProject ? <PointsTab /> : <ProjectNotSelected />}
         </TabsContent>

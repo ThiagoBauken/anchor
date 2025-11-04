@@ -58,7 +58,10 @@
       "Bash(del \"C:\\Users\\Thiago\\Desktop\\anchor\\TYPES_UPDATE.ts\")",
       "Bash(nul)",
       "Bash(findstr:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: Regenera package-lock.json para corrigir build no EasyPanel\n\nResolve erro:\n- Missing: preact@10.11.3 from lock file\n- npm ci failing devido a package.json e package-lock.json fora de sincronia\n\nRodado npm install para sincronizar lock file com package.json.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

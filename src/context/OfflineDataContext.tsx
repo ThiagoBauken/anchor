@@ -244,30 +244,30 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
       setTests(loadedTests)
 
       // Load floor plans for current project
-      // TODO: FloorPlan feature not implemented in MVP - commented out
-      // if (currentProject) {
-      //   try {
-      //     const { getFloorPlansForProject } = await import('@/app/actions/floorplan-actions')
-      //     const loadedFloorPlans = await getFloorPlansForProject(currentProject.id)
-      //     // Convert Date objects to strings for FloorPlan type
-      //     const convertedFloorPlans: FloorPlan[] = loadedFloorPlans.map(fp => ({
-      //       id: fp.id,
-      //       projectId: fp.projectId,
-      //       name: fp.name,
-      //       image: fp.image,
-      //       order: fp.order,
-      //       active: fp.active,
-      //       createdAt: new Date(fp.createdAt).toISOString(),
-      //       updatedAt: new Date(fp.updatedAt).toISOString(),
-      //       anchorPoints: []
-      //     }))
-      //     setFloorPlans(convertedFloorPlans)
-      //   } catch (error) {
-      //     console.error('Error loading floor plans:', error)
-      //     setFloorPlans([])
-      //   }
-      // }
-      setFloorPlans([])
+      if (currentProject) {
+        try {
+          const { getFloorPlansForProject } = await import('@/app/actions/floorplan-actions')
+          const loadedFloorPlans = await getFloorPlansForProject(currentProject.id)
+          // Convert Date objects to strings for FloorPlan type
+          const convertedFloorPlans: FloorPlan[] = loadedFloorPlans.map(fp => ({
+            id: fp.id,
+            projectId: fp.projectId,
+            name: fp.name,
+            image: fp.image,
+            order: fp.order,
+            active: fp.active,
+            createdAt: new Date(fp.createdAt).toISOString(),
+            updatedAt: new Date(fp.updatedAt).toISOString(),
+            anchorPoints: []
+          }))
+          setFloorPlans(convertedFloorPlans)
+        } catch (error) {
+          console.error('Error loading floor plans:', error)
+          setFloorPlans([])
+        }
+      } else {
+        setFloorPlans([])
+      }
       
       // Set default project if none selected
       if (!currentProject && loadedProjects.length > 0) {
@@ -527,27 +527,112 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
 
   // Floor Plan methods
   const createFloorPlan = async (name: string, image: string, order: number): Promise<FloorPlan | null> => {
-    // TODO: FloorPlan feature not implemented in MVP
-    console.warn('createFloorPlan: Feature not available in current version')
-    return null
+    if (!currentProject) throw new Error('No project selected')
+
+    try {
+      const { createFloorPlan: createFloorPlanAction } = await import('@/app/actions/floorplan-actions')
+      const newFloorPlan = await createFloorPlanAction(currentProject.id, name, image, order)
+
+      if (newFloorPlan) {
+        const convertedFloorPlan: FloorPlan = {
+          id: newFloorPlan.id,
+          projectId: newFloorPlan.projectId,
+          name: newFloorPlan.name,
+          image: newFloorPlan.image,
+          order: newFloorPlan.order,
+          active: newFloorPlan.active,
+          createdAt: new Date(newFloorPlan.createdAt).toISOString(),
+          updatedAt: new Date(newFloorPlan.updatedAt).toISOString(),
+          anchorPoints: []
+        }
+        setFloorPlans(prev => [...prev, convertedFloorPlan])
+        console.log('✅ Floor plan created:', newFloorPlan.name)
+        return convertedFloorPlan
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error creating floor plan:', error)
+      return null
+    }
   }
 
   const updateFloorPlan = async (id: string, name: string, order: number): Promise<FloorPlan | null> => {
-    // TODO: FloorPlan feature not implemented in MVP
-    console.warn('updateFloorPlan: Feature not available in current version')
-    return null
+    try {
+      const { updateFloorPlan: updateFloorPlanAction } = await import('@/app/actions/floorplan-actions')
+      const updatedFloorPlan = await updateFloorPlanAction(id, name, order)
+
+      if (updatedFloorPlan) {
+        const convertedFloorPlan: FloorPlan = {
+          id: updatedFloorPlan.id,
+          projectId: updatedFloorPlan.projectId,
+          name: updatedFloorPlan.name,
+          image: updatedFloorPlan.image,
+          order: updatedFloorPlan.order,
+          active: updatedFloorPlan.active,
+          createdAt: new Date(updatedFloorPlan.createdAt).toISOString(),
+          updatedAt: new Date(updatedFloorPlan.updatedAt).toISOString(),
+          anchorPoints: []
+        }
+        setFloorPlans(prev => prev.map(fp => fp.id === id ? convertedFloorPlan : fp))
+        console.log('✅ Floor plan updated:', updatedFloorPlan.name)
+        return convertedFloorPlan
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error updating floor plan:', error)
+      return null
+    }
   }
 
   const deleteFloorPlan = async (id: string): Promise<boolean> => {
-    // TODO: FloorPlan feature not implemented in MVP
-    console.warn('deleteFloorPlan: Feature not available in current version')
-    return false
+    try {
+      const { deleteFloorPlan: deleteFloorPlanAction } = await import('@/app/actions/floorplan-actions')
+      const success = await deleteFloorPlanAction(id)
+
+      if (success) {
+        setFloorPlans(prev => prev.filter(fp => fp.id !== id))
+        if (currentFloorPlan?.id === id) {
+          setCurrentFloorPlan(null)
+        }
+        console.log('✅ Floor plan deleted')
+      }
+
+      return success
+    } catch (error) {
+      console.error('Error deleting floor plan:', error)
+      return false
+    }
   }
 
   const toggleFloorPlanActive = async (id: string, active: boolean): Promise<FloorPlan | null> => {
-    // TODO: FloorPlan feature not implemented in MVP
-    console.warn('toggleFloorPlanActive: Feature not available in current version')
-    return null
+    try {
+      const { toggleFloorPlanActive: toggleFloorPlanActiveAction } = await import('@/app/actions/floorplan-actions')
+      const updatedFloorPlan = await toggleFloorPlanActiveAction(id, active)
+
+      if (updatedFloorPlan) {
+        const convertedFloorPlan: FloorPlan = {
+          id: updatedFloorPlan.id,
+          projectId: updatedFloorPlan.projectId,
+          name: updatedFloorPlan.name,
+          image: updatedFloorPlan.image,
+          order: updatedFloorPlan.order,
+          active: updatedFloorPlan.active,
+          createdAt: new Date(updatedFloorPlan.createdAt).toISOString(),
+          updatedAt: new Date(updatedFloorPlan.updatedAt).toISOString(),
+          anchorPoints: []
+        }
+        setFloorPlans(prev => prev.map(fp => fp.id === id ? convertedFloorPlan : fp))
+        console.log('✅ Floor plan active status updated:', active)
+        return convertedFloorPlan
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error toggling floor plan active status:', error)
+      return null
+    }
   }
 
   // Point methods

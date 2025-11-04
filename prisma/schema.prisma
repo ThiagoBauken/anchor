@@ -84,6 +84,11 @@ model User {
   userSessions             UserSession[]
   accounts                 Account[]
   sessions                 Session[]
+  inspectionsAsEngineer    FacadeInspection[]    @relation("InspectionEngineer")
+  createdInspections       FacadeInspection[]    @relation("InspectionCreator")
+  createdPathologyMarkers  PathologyMarker[]     @relation("PathologyMarkerCreator")
+  reportsAsEngineer        InspectionReport[]    @relation("ReportEngineer")
+  approvedReports          InspectionReport[]    @relation("ReportApprover")
 }
 
 model Location {
@@ -133,6 +138,9 @@ model Project {
   photos                       Photo[]
   publicSettings               ProjectPublicSettings?
   teamPermissions              ProjectTeamPermission[]
+  floorPlans                   FloorPlan[]
+  facadeInspections            FacadeInspection[]
+  pathologyCategories          PathologyCategory[]
 }
 
 model SubscriptionPlan {
@@ -212,9 +220,11 @@ model AnchorPoint {
   lastModifiedByUserId    String?      @map("last_modified_by_user_id")
   archived                Boolean      @default(false)
   archivedAt              DateTime?    @map("archived_at")
+  floorPlanId             String?      @map("floor_plan_id")
   createdBy               User?        @relation("CreatedByUser", fields: [createdByUserId], references: [id])
   lastModifiedBy          User?        @relation("LastModifiedByUser", fields: [lastModifiedByUserId], references: [id])
   project                 Project      @relation(fields: [projectId], references: [id])
+  floorPlan               FloorPlan?   @relation(fields: [floorPlanId], references: [id], onDelete: SetNull)
   anchorTests             AnchorTest[]
   photos                  Photo[]
 
@@ -766,6 +776,120 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// Floor Plan System
+model FloorPlan {
+  id           String        @id @default(cuid())
+  projectId    String        @map("project_id")
+  name         String
+  image        String        @db.Text // Base64 image
+  order        Int           @default(0)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  anchorPoints AnchorPoint[]
+
+  @@index([projectId])
+  @@map("floor_plans")
+}
+
+// Facade Inspection System
+model FacadeInspection {
+  id          String                @id @default(cuid())
+  projectId   String                @map("project_id")
+  name        String
+  description String?
+  status      InspectionStatus      @default(in_progress)
+  engineerId  String?               @map("engineer_id")
+  createdById String                @map("created_by_id")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineer    User?                 @relation("InspectionEngineer", fields: [engineerId], references: [id])
+  createdBy   User                  @relation("InspectionCreator", fields: [createdById], references: [id])
+  facadeSides FacadeSide[]
+  reports     InspectionReport[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("facade_inspections")
+}
+
+model FacadeSide {
+  id                  String             @id @default(cuid())
+  facadeInspectionId  String             @map("facade_inspection_id")
+  name                String
+  sideType            FacadeSideType     @map("side_type")
+  image               String             @db.Text // Base64 floor plan image
+  order               Int                @default(0)
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  facadeInspection    FacadeInspection   @relation(fields: [facadeInspectionId], references: [id], onDelete: Cascade)
+  pathologyMarkers    PathologyMarker[]
+
+  @@index([facadeInspectionId])
+  @@map("facade_sides")
+}
+
+model PathologyCategory {
+  id                String            @id @default(cuid())
+  projectId         String            @map("project_id")
+  name              String
+  color             String            // Hex color
+  severity          PathologySeverity @default(medium)
+  description       String?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pathologyMarkers  PathologyMarker[]
+
+  @@index([projectId])
+  @@map("pathology_categories")
+}
+
+model PathologyMarker {
+  id            String             @id @default(cuid())
+  facadeSideId  String             @map("facade_side_id")
+  categoryId    String             @map("category_id")
+  x             Float              // X coordinate on image (percentage)
+  y             Float              // Y coordinate on image (percentage)
+  description   String?
+  severity      PathologySeverity  @default(medium)
+  photos        String[]           @default([]) // Array of base64 images
+  createdById   String             @map("created_by_id")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  facadeSide    FacadeSide         @relation(fields: [facadeSideId], references: [id], onDelete: Cascade)
+  category      PathologyCategory  @relation(fields: [categoryId], references: [id])
+  createdBy     User               @relation("PathologyMarkerCreator", fields: [createdById], references: [id])
+
+  @@index([facadeSideId])
+  @@index([categoryId])
+  @@map("pathology_markers")
+}
+
+model InspectionReport {
+  id                  String           @id @default(cuid())
+  facadeInspectionId  String           @map("facade_inspection_id")
+  version             Int              @default(1)
+  title               String
+  summary             String           @db.Text
+  recommendations     String           @db.Text
+  engineerId          String           @map("engineer_id")
+  approverId          String?          @map("approver_id")
+  approvedAt          DateTime?        @map("approved_at")
+  pdfUrl              String?          @map("pdf_url")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  facadeInspection    FacadeInspection @relation(fields: [facadeInspectionId], references: [id], onDelete: Cascade)
+  engineer            User             @relation("ReportEngineer", fields: [engineerId], references: [id])
+  approver            User?            @relation("ReportApprover", fields: [approverId], references: [id])
+
+  @@index([facadeInspectionId])
+  @@index([version])
+  @@map("inspection_reports")
+}
+
 enum UserRole {
   superadmin
   company_admin
@@ -785,4 +909,26 @@ enum PaymentStatus {
   pending
   failed
   refunded
+}
+
+enum InspectionStatus {
+  in_progress
+  completed
+  approved
+  archived
+}
+
+enum FacadeSideType {
+  front
+  back
+  left
+  right
+  internal
+}
+
+enum PathologySeverity {
+  low
+  medium
+  high
+  critical
 }
