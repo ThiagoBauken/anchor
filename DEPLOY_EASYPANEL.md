@@ -33,13 +33,33 @@ No EasyPanel, adicione um serviço PostgreSQL:
 
 ### 3. Configurar Variáveis de Ambiente
 
+**⚠️ IMPORTANTE:** Se sua senha contém caracteres especiais (!, @, #, $, etc.), você DEVE codificá-los em URL:
+- `!` → `%21`
+- `@` → `%40`
+- `#` → `%23`
+- `$` → `%24`
+- `%` → `%25`
+
+**Exemplo:**
+- Senha: `privado12!`
+- DATABASE_URL: `postgresql://anchor:privado12%21@postgres-service:5432/anchorview`
+
 ```env
-DATABASE_URL=postgresql://anchor:SUA_SENHA@postgres-service:5432/anchorview
+# Database (URL-encode special characters in password!)
+DATABASE_URL=postgresql://anchor:SUA_SENHA_CODIFICADA@postgres-service:5432/anchorview?sslmode=disable
+
+# Application
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://seu-dominio.easypanel.host
 PORT=9002
-JWT_SECRET=sua-chave-secreta-super-segura-aqui
+
+# Authentication (REQUIRED)
+JWT_SECRET=sua-chave-secreta-super-segura-aqui-minimo-32-caracteres
+
+# Google AI (Genkit)
 GEMINI_API_KEY=sua-api-key-do-gemini
+
+# Next.js
 NEXT_TELEMETRY_DISABLED=1
 ```
 
@@ -53,6 +73,36 @@ NEXT_TELEMETRY_DISABLED=1
 ### 5. Deploy
 
 Clique em **"Deploy"** e aguarde (5-10 minutos)
+
+### 6. Pós-Deploy (Primeira Vez)
+
+Após o primeiro deploy bem-sucedido:
+
+1. **Rodar Migrações do Banco:**
+   ```bash
+   # SSH no container ou use terminal do EasyPanel
+   npx prisma migrate deploy
+   ```
+
+2. **Criar Superadmin (Opcional):**
+   ```bash
+   node create-superadmin.js
+   # Login: admin@anchorview.com
+   # Senha: admin123
+   ```
+
+3. **Verificar Logs:**
+   - Procure por: `✅ Database connection successful`
+   - Se aparecer `❌ Database connection failed`, verifique o DATABASE_URL
+
+### 7. Troubleshooting
+
+Se encontrar erros, consulte: [DEPLOY_TROUBLESHOOTING.md](./DEPLOY_TROUBLESHOOTING.md)
+
+**Erros comuns:**
+- `Database connection failed` → Verifique URL encoding de caracteres especiais
+- `authentication failed` → Verifique usuário/senha do PostgreSQL
+- `Connection refused` → Verifique se PostgreSQL está rodando
 
 ---
 

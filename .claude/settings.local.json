@@ -57,7 +57,8 @@
       "Bash(timeout 10 echo \"Verificando compilação...\")",
       "Bash(del \"C:\\Users\\Thiago\\Desktop\\anchor\\TYPES_UPDATE.ts\")",
       "Bash(nul)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm start)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

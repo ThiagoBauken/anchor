@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { SessionProvider } from 'next-auth/react'
 import { DatabaseAuthProvider } from '@/context/DatabaseAuthContext'
 import { OfflineDataProvider } from '@/context/OfflineDataContext'
 import { AnchorDataProvider } from '@/context/AnchorDataContext'
@@ -18,12 +19,14 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <DatabaseAuthProvider>
-      <OfflineDataProvider>
-        <AnchorDataProvider>
-          {children}
-        </AnchorDataProvider>
-      </OfflineDataProvider>
-    </DatabaseAuthProvider>
+    <SessionProvider>
+      <DatabaseAuthProvider>
+        <OfflineDataProvider>
+          <AnchorDataProvider>
+            {children}
+          </AnchorDataProvider>
+        </OfflineDataProvider>
+      </DatabaseAuthProvider>
+    </SessionProvider>
   )
 }

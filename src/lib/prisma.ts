@@ -7,16 +7,48 @@ declare global {
 // Modo de fallback quando o banco não está disponível
 const createPrismaClient = () => {
   try {
-    return new PrismaClient({
-      log: ['error', 'warn'],
+    // Check if DATABASE_URL is set
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ DATABASE_URL is not set in environment variables')
+      console.error('Please configure DATABASE_URL in your .env file or deployment environment')
+      return null
+    }
+
+    console.log('🔌 Initializing Prisma Client...')
+    console.log('📍 DATABASE_URL format:', process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@'))
+
+    const client = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error', 'warn'],
       datasources: {
         db: {
           url: process.env.DATABASE_URL
         }
       }
     })
-  } catch (error) {
-    console.warn('Database connection failed, using localStorage fallback')
+
+    // Test connection immediately (async IIFE)
+    ;(async () => {
+      try {
+        await client.$connect()
+        console.log('✅ Database connection successful')
+      } catch (error: any) {
+        console.error('❌ Database connection failed:', error.message)
+        if (error.message.includes('authentication failed')) {
+          console.error('💡 Check your database credentials (username/password)')
+        }
+        if (error.message.includes('Connection refused')) {
+          console.error('💡 Check if PostgreSQL is running and accessible')
+        }
+        if (error.message.includes('timeout')) {
+          console.error('💡 Check database host and network connectivity')
+        }
+      }
+    })()
+
+    return client
+  } catch (error: any) {
+    console.error('❌ Failed to create Prisma Client:', error.message)
+    console.warn('⚠️  Using localStorage fallback mode')
     return null
   }
 }

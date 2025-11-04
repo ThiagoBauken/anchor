@@ -16,10 +16,19 @@ export async function registerUser(data: {
   companyType?: 'administradora' | 'alpinista' // New field to determine role
 }) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.log('Database not available, using localStorage fallback')
+      return {
+        success: false,
+        message: 'Banco de dados indisponível. Use o modo offline.'
+      }
+    }
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email }
-    })
+    }).catch(() => null)
 
     if (existingUser) {
       return {
@@ -43,7 +52,7 @@ export async function registerUser(data: {
         isTrialActive: true,
         daysRemainingInTrial: 14
       }
-      
+
       const company = await tx.company.create({
         data: companyData
       })
@@ -70,7 +79,18 @@ export async function registerUser(data: {
       })
 
       return { user, company }
+    }).catch((error) => {
+      console.error('Transaction error:', error)
+      return null
     })
+
+    // Check if transaction succeeded
+    if (!result || !result.user || !result.company) {
+      return {
+        success: false,
+        message: 'Erro ao criar conta. Banco de dados indisponível.'
+      }
+    }
 
     // Create JWT token
     const token = jwt.sign(
@@ -120,10 +140,22 @@ export async function registerUser(data: {
 
 export async function loginUser(email: string, password: string) {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.log('Database not available, using localStorage fallback')
+      return {
+        success: false,
+        message: 'Banco de dados indisponível. Use o modo offline.'
+      }
+    }
+
     // Find user with company
     const user = await prisma.user.findUnique({
       where: { email },
       include: { company: true }
+    }).catch((error) => {
+      console.error('Database query error:', error)
+      return null
     })
 
     if (!user) {
@@ -134,8 +166,8 @@ export async function loginUser(email: string, password: string) {
     }
 
     // Verify password
-    const validPassword = await bcrypt.compare(password, user.password)
-    
+    const validPassword = await bcrypt.compare(password, user.password).catch(() => false)
+
     if (!validPassword) {
       return {
         success: false,
@@ -192,7 +224,7 @@ export async function loginUser(email: string, password: string) {
     console.error('Login error:', error)
     return {
       success: false,
-      message: 'Erro ao fazer login. Tente novamente.'
+      message: 'Erro ao fazer login. Banco de dados indisponível.'
     }
   }
 }
@@ -217,6 +249,12 @@ export async function logoutUser() {
 
 export async function getCurrentUser() {
   try {
+    // Check if Prisma is available
+    if (!prisma) {
+      console.log('Database not available, using localStorage fallback')
+      return null
+    }
+
     const cookieStore = await cookies()
     const token = cookieStore.get('auth-token')
 
@@ -225,12 +263,25 @@ export async function getCurrentUser() {
     }
 
     // Verify token
-    const decoded = jwt.verify(token.value, JWT_SECRET) as any
+    let decoded: any
+    try {
+      decoded = jwt.verify(token.value, JWT_SECRET)
+    } catch (jwtError) {
+      console.error('JWT verification error:', jwtError)
+      return null
+    }
+
+    if (!decoded || !decoded.id) {
+      return null
+    }
 
     // Get user from database
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: { company: true }
+    }).catch((error) => {
+      console.error('Database query error:', error)
+      return null
     })
 
     if (!user || !user.active) {

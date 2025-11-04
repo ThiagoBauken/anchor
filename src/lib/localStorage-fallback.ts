@@ -113,10 +113,12 @@ export const localStorageUsers = {
         updatedAt: now,
         lastLogin: null,
         phone: null,
-        companyId
+        companyId,
+        image: null,
+        emailVerified: null
       };
     }
-    
+
     const users = JSON.parse(localStorage.getItem('anchor-users') || '[]') as LocalStorageUser[];
     const now = new Date();
     const newUser: LocalStorageUser = {
@@ -130,7 +132,9 @@ export const localStorageUsers = {
       updatedAt: now,
       lastLogin: null,
       phone: null,
-      companyId
+      companyId,
+      image: null,
+      emailVerified: null
     };
 
     users.push(newUser);

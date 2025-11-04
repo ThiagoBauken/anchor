@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 /**
  * Envia convite de projeto para uma empresa
@@ -517,12 +518,15 @@ export async function acceptInvitation(
       }
     }
 
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(userData.password, 10)
+
     // Create user
     const user = await prisma.user.create({
       data: {
         name: userData.name,
         email: invitation.email,
-        password: userData.password, // In production, should hash with bcrypt
+        password: hashedPassword,
         phone: userData.phone,
         role: invitation.role,
         companyId: invitation.companyId,
