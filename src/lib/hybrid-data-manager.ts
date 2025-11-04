@@ -284,14 +284,72 @@ export class HybridDataManager {
   getPendingItems(): { points: number; tests: number; total: number } {
     const points = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
     const tests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
-    
+
     const pendingPoints = points.filter((p: any) => p.syncStatus === 'pending').length;
     const pendingTests = tests.filter((t: any) => t.syncStatus === 'pending').length;
-    
+
     return {
       points: pendingPoints,
       tests: pendingTests,
       total: pendingPoints + pendingTests
+    };
+  }
+
+  // Unified method that checks BOTH localStorage and IndexedDB
+  async getTotalPendingItems(): Promise<{
+    localStorage: { points: number; tests: number; total: number };
+    indexedDB: number;
+    total: number;
+    details: {
+      source: string;
+      count: number;
+      type: string;
+    }[];
+  }> {
+    // Get localStorage pending items
+    const localStoragePending = this.getPendingItems();
+
+    // Get IndexedDB sync queue (operations pending sync)
+    let indexedDBPending = 0;
+    const details: { source: string; count: number; type: string }[] = [];
+
+    try {
+      const { offlineDB } = await import('./indexeddb');
+      const syncQueue = await offlineDB.getSyncQueue();
+      indexedDBPending = syncQueue.filter(op => op.status === 'pending').length;
+
+      if (localStoragePending.points > 0) {
+        details.push({
+          source: 'localStorage',
+          count: localStoragePending.points,
+          type: 'Pontos de Ancoragem'
+        });
+      }
+
+      if (localStoragePending.tests > 0) {
+        details.push({
+          source: 'localStorage',
+          count: localStoragePending.tests,
+          type: 'Testes de Carga'
+        });
+      }
+
+      if (indexedDBPending > 0) {
+        details.push({
+          source: 'IndexedDB',
+          count: indexedDBPending,
+          type: 'Operações na Fila'
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to get IndexedDB pending items:', error);
+    }
+
+    return {
+      localStorage: localStoragePending,
+      indexedDB: indexedDBPending,
+      total: localStoragePending.total + indexedDBPending,
+      details
     };
   }
 

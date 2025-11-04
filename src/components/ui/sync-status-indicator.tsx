@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Wifi, WifiOff, RefreshCw, Check, AlertCircle, Clock } from 'lucide-react';
@@ -12,11 +13,12 @@ interface SyncStatusIndicatorProps {
   compact?: boolean;
 }
 
-export function SyncStatusIndicator({ 
+export function SyncStatusIndicator({
   onManualSync,
   showSyncButton = true,
   compact = false
 }: SyncStatusIndicatorProps) {
+  const router = useRouter();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [pendingItems, setPendingItems] = useState(0);
@@ -109,13 +111,29 @@ export function SyncStatusIndicator({
   if (compact) {
     return (
       <div className="flex items-center gap-2">
-        <Badge variant="secondary" className={`${getStatusColor()} text-white`}>
-          <div className="flex items-center gap-1">
-            {getStatusIcon()}
-            <span className="text-xs">{getStatusText()}</span>
-          </div>
-        </Badge>
-        
+        {/* Badge clicável quando há pendentes */}
+        {pendingItems > 0 ? (
+          <button
+            onClick={() => router.push('/sync')}
+            className="transition-transform hover:scale-105"
+            title="Clique para ver detalhes dos itens pendentes"
+          >
+            <Badge variant="secondary" className={`${getStatusColor()} text-white cursor-pointer`}>
+              <div className="flex items-center gap-1">
+                {getStatusIcon()}
+                <span className="text-xs">{getStatusText()}</span>
+              </div>
+            </Badge>
+          </button>
+        ) : (
+          <Badge variant="secondary" className={`${getStatusColor()} text-white`}>
+            <div className="flex items-center gap-1">
+              {getStatusIcon()}
+              <span className="text-xs">{getStatusText()}</span>
+            </div>
+          </Badge>
+        )}
+
         {showSyncButton && isOnline && pendingItems > 0 && (
           <Button
             variant="ghost"
@@ -123,6 +141,7 @@ export function SyncStatusIndicator({
             onClick={handleSync}
             disabled={syncInProgress}
             className="h-6 px-2"
+            title="Sincronizar agora"
           >
             <RefreshCw className={`h-3 w-3 ${syncInProgress ? 'animate-spin' : ''}`} />
           </Button>
@@ -133,13 +152,28 @@ export function SyncStatusIndicator({
 
   return (
     <div className="flex items-center gap-3 p-3 bg-background border rounded-lg">
-      {/* Status Principal */}
-      <Badge variant="secondary" className={`${getStatusColor()} text-white`}>
-        <div className="flex items-center gap-2">
-          {getStatusIcon()}
-          <span className="text-sm font-medium">{getStatusText()}</span>
-        </div>
-      </Badge>
+      {/* Status Principal - Clicável quando há pendentes */}
+      {pendingItems > 0 ? (
+        <button
+          onClick={() => router.push('/sync')}
+          className="transition-transform hover:scale-105"
+          title="Clique para ver detalhes dos itens pendentes"
+        >
+          <Badge variant="secondary" className={`${getStatusColor()} text-white cursor-pointer`}>
+            <div className="flex items-center gap-2">
+              {getStatusIcon()}
+              <span className="text-sm font-medium">{getStatusText()}</span>
+            </div>
+          </Badge>
+        </button>
+      ) : (
+        <Badge variant="secondary" className={`${getStatusColor()} text-white`}>
+          <div className="flex items-center gap-2">
+            {getStatusIcon()}
+            <span className="text-sm font-medium">{getStatusText()}</span>
+          </div>
+        </Badge>
+      )}
 
       {/* Indicador de Conexão */}
       <div className="flex items-center gap-1">

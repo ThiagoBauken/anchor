@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Wifi, 
-  WifiOff, 
-  RefreshCw, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
   Clock,
   Database,
   Upload,
@@ -25,6 +26,7 @@ interface OfflineStatusProps {
 }
 
 export function OfflineStatus({ className = '', compact = false }: OfflineStatusProps) {
+  const router = useRouter()
   const { isOnline, syncStatus, lastSync, syncNow } = useOfflineAuthSafe()
   const [stats, setStats] = useState({
     pending: 0,
@@ -115,11 +117,17 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
           </span>
         </div>
 
-        {/* Pending items */}
+        {/* Pending items - Clicável */}
         {stats.pending > 0 && (
-          <Badge variant="secondary" className="text-xs">
-            {stats.pending} pendente{stats.pending > 1 ? 's' : ''}
-          </Badge>
+          <button
+            onClick={() => router.push('/sync')}
+            className="transition-transform hover:scale-105"
+            title="Clique para ver detalhes dos itens pendentes"
+          >
+            <Badge variant="secondary" className="text-xs cursor-pointer">
+              {stats.pending} pendente{stats.pending > 1 ? 's' : ''}
+            </Badge>
+          </button>
         )}
       </div>
     )
