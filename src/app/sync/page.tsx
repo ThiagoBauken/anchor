@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,8 @@ import {
   Trash2,
   MapPin,
   TestTube,
-  XCircle
+  XCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { hybridDataManager } from '@/lib/hybrid-data-manager';
 
@@ -40,6 +42,7 @@ interface PendingItem {
 }
 
 export default function SyncPage() {
+  const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [pendingItems, setPendingItems] = useState({ points: 0, tests: 0, total: 0 });
@@ -61,9 +64,19 @@ export default function SyncPage() {
     // Carrega dados iniciais
     loadSyncStatus();
 
+    // Atualiza status quando a página se torna visível novamente
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadSyncStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -200,6 +213,17 @@ export default function SyncPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="mb-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/app')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao Menu
+          </Button>
+        </div>
         <h1 className="text-3xl font-bold mb-2">Status de Sincronização</h1>
         <p className="text-muted-foreground">
           Monitore e gerencie a sincronização entre dados offline e servidor
