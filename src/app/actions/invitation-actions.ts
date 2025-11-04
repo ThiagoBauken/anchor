@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { headers } from 'next/headers'
 
 /**
  * Envia convite de projeto para uma empresa
@@ -355,8 +356,16 @@ export async function createInvitation(data: {
       }
     })
 
-    // Generate invite URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'
+    // Generate invite URL - automatically detect production URL
+    const headersList = await headers()
+    const host = headersList.get('host')
+    const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
+
+    // Use detected host or fallback to env variable
+    const baseUrl = host
+      ? `${protocol}://${host}`
+      : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002')
+
     const inviteUrl = `${baseUrl}/auth/register/${token}`
 
     return {
