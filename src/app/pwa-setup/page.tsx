@@ -5,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Smartphone, 
-  Wifi, 
-  WifiOff, 
-  Download, 
-  Bell, 
-  Camera, 
+import {
+  Smartphone,
+  Wifi,
+  WifiOff,
+  Download,
+  Bell,
+  Camera,
   Database,
   CheckCircle,
   XCircle,
@@ -21,8 +21,11 @@ import {
 import { pwaIntegration } from '@/lib/pwa-integration'
 import { OfflinePhotoCapture } from '@/components/offline-photo-capture'
 
+// Force dynamic rendering (no SSG) - required because this page uses browser APIs
+export const dynamic = 'force-dynamic'
+
 export default function PWASetupPage() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [swStatus, setSWStatus] = useState<'not-supported' | 'not-registered' | 'registered' | 'error'>('not-supported')
   const [isInstalled, setIsInstalled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
