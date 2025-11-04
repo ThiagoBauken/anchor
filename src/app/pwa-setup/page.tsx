@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,21 +19,32 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react'
-import { pwaIntegration } from '@/lib/pwa-integration'
-import { OfflinePhotoCapture } from '@/components/offline-photo-capture'
 
-// Force dynamic rendering (no SSG) - required because this page uses browser APIs
-export const dynamic = 'force-dynamic'
+// Lazy load client-only components
+const OfflinePhotoCapture = dynamic(() => import('@/components/offline-photo-capture').then(mod => ({ default: mod.OfflinePhotoCapture })), {
+  ssr: false,
+  loading: () => <p>Loading camera...</p>
+})
 
-export default function PWASetupPage() {
-  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
+// Client-only component wrapper to prevent SSR/SSG
+function PWASetupPageClient() {
+  const [isMounted, setIsMounted] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
   const [swStatus, setSWStatus] = useState<'not-supported' | 'not-registered' | 'registered' | 'error'>('not-supported')
   const [isInstalled, setIsInstalled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
   const [syncStatus, setSyncStatus] = useState({ pendingPhotos: 0, pendingItems: 0, isOnline: false, lastSync: null })
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
+  // Mount check to prevent SSR/SSG issues
   useEffect(() => {
+    setIsMounted(true)
+    setIsOnline(navigator.onLine)
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted) return
+
     // Check initial states
     checkServiceWorkerStatus()
     checkInstallationStatus()
@@ -56,7 +68,7 @@ export default function PWASetupPage() {
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }
-  }, [])
+  }, [isMounted])
 
   const checkServiceWorkerStatus = async () => {
     if ('serviceWorker' in navigator) {
@@ -86,6 +98,7 @@ export default function PWASetupPage() {
 
   const updateSyncStatus = async () => {
     try {
+      const { pwaIntegration } = await import('@/lib/pwa-integration')
       const status = await pwaIntegration.getSyncStatus()
       setSyncStatus(status)
     } catch (error) {
@@ -107,12 +120,14 @@ export default function PWASetupPage() {
   }
 
   const handleRequestNotifications = async () => {
+    const { pwaIntegration } = await import('@/lib/pwa-integration')
     const granted = await pwaIntegration.requestNotificationPermission()
     setNotificationPermission(granted ? 'granted' : 'denied')
   }
 
   const handleManualSync = async () => {
     try {
+      const { pwaIntegration } = await import('@/lib/pwa-integration')
       await pwaIntegration.manualSync()
       await updateSyncStatus()
     } catch (error) {
@@ -132,6 +147,17 @@ export default function PWASetupPage() {
   const StatusIcon = ({ status }: { status: boolean }) => (
     status ? <CheckCircle className="w-5 h-5 text-green-500" /> : <XCircle className="w-5 h-5 text-red-500" />
   )
+
+  // Only render after mount to prevent SSR/SSG issues
+  if (!isMounted) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p>Loading PWA Setup...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -370,4 +396,9 @@ export default function PWASetupPage() {
       </Card>
     </div>
   )
+}
+
+// Export default with client-only rendering
+export default function PWASetupPage() {
+  return <PWASetupPageClient />
 }
