@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ size: string }> }
+  context: { params: Promise<{ size: string }> }
 ) {
-  const resolvedParams = await params
-  const size = parseInt(resolvedParams.size)
+  const { size: sizeParam } = await context.params
+  const size = parseInt(sizeParam)
 
   if (isNaN(size) || size < 16 || size > 1024) {
-    return new NextResponse('Invalid size', { status: 400 })
+    return new Response('Invalid size', { status: 400 })
   }
 
   return new ImageResponse(
@@ -32,7 +32,6 @@ export async function GET(
           height={size * 0.6}
           viewBox="0 0 24 24"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
         >
           <path
             d="M12 2L2 7L12 12L22 7L12 2Z"
