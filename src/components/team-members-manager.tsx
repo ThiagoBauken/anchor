@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useOfflineData } from '@/context/OfflineDataContext';
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext';
 import { Plus, Trash2, UserPlus, Crown, Eye, User } from 'lucide-react';
 import {
   getTeamMembers,
@@ -14,6 +14,7 @@ import {
   removeTeamMember,
   updateTeamMemberRole
 } from '@/app/actions/team-actions';
+import { getUsersForCompany } from '@/app/actions/user-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,8 +34,9 @@ interface TeamMembersManagerProps {
 
 export default function TeamMembersManager({ teamId, onUpdate }: TeamMembersManagerProps) {
   const { toast } = useToast();
-  const { users } = useOfflineData();
+  const { company } = useDatabaseAuthSafe();
   const [members, setMembers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [adding, setAdding] = useState(false);
@@ -51,9 +53,20 @@ export default function TeamMembersManager({ teamId, onUpdate }: TeamMembersMana
     }
   };
 
+  const loadUsers = async () => {
+    if (!company?.id) return;
+    try {
+      const data = await getUsersForCompany(company.id);
+      setUsers(data);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
+  };
+
   useEffect(() => {
     loadMembers();
-  }, [teamId]);
+    loadUsers();
+  }, [teamId, company?.id]);
 
   const availableUsers = users.filter(
     user => !members.some(m => m.userId === user.id)

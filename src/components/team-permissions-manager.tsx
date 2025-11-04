@@ -289,9 +289,9 @@ export default function TeamPermissionsManager({ teamId, teamName, onUpdate }: T
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`edit-${permission.id}`}
-                          checked={permission.canEdit}
+                          checked={permission.canEditPoints}
                           onCheckedChange={(checked) =>
-                            handleTogglePermission(permission.id, 'canEdit', checked)
+                            handleTogglePermission(permission.id, 'canEditPoints', checked)
                           }
                         />
                         <Label
@@ -307,9 +307,9 @@ export default function TeamPermissionsManager({ teamId, teamName, onUpdate }: T
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`delete-${permission.id}`}
-                          checked={permission.canDelete}
+                          checked={permission.canDeletePoints}
                           onCheckedChange={(checked) =>
-                            handleTogglePermission(permission.id, 'canDelete', checked)
+                            handleTogglePermission(permission.id, 'canDeletePoints', checked)
                           }
                         />
                         <Label
@@ -325,9 +325,9 @@ export default function TeamPermissionsManager({ teamId, teamName, onUpdate }: T
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`export-${permission.id}`}
-                          checked={permission.canExport}
+                          checked={permission.canExportReports}
                           onCheckedChange={(checked) =>
-                            handleTogglePermission(permission.id, 'canExport', checked)
+                            handleTogglePermission(permission.id, 'canExportReports', checked)
                           }
                         />
                         <Label
@@ -343,9 +343,9 @@ export default function TeamPermissionsManager({ teamId, teamName, onUpdate }: T
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`tests-${permission.id}`}
-                          checked={permission.canManageTests}
+                          checked={permission.canTestPoints}
                           onCheckedChange={(checked) =>
-                            handleTogglePermission(permission.id, 'canManageTests', checked)
+                            handleTogglePermission(permission.id, 'canTestPoints', checked)
                           }
                         />
                         <Label

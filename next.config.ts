@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'localhost:9002'],
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '10mb', // Increased for floor plans and facade photos
     },
   },
   // Turbopack configuration

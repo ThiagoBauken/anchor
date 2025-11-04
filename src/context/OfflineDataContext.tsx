@@ -421,25 +421,51 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
   }
 
   const addUser = async (name: string, role: UserRole): Promise<User> => {
-    if (!currentCompany) throw new Error('Not authenticated')
-    
-    // For simple local users, we don't need email/password
-    const user: User = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      role,
-      companyId: currentCompany.id,
-      active: true
+    if (!currentCompany || !currentUser) throw new Error('Not authenticated')
+
+    try {
+      // Import server action
+      const { addUser: addUserAction } = await import('@/app/actions/user-actions')
+
+      // Try to save to database first
+      console.log('[DEBUG] Attempting to save user to database...')
+      const savedUser = await addUserAction(name, role, currentCompany.id)
+
+      if (savedUser) {
+        console.log('✅ User created in database:', savedUser.id)
+
+        // Also save to IndexedDB for offline access
+        await offlineDB.put('users', savedUser)
+
+        // Update local state
+        setUsers(prev => [...prev, savedUser])
+
+        return savedUser
+      }
+
+      throw new Error('Failed to save user to database')
+
+    } catch (error) {
+      console.warn('[WARN] Database save failed, using IndexedDB fallback:', error)
+
+      // Fallback to IndexedDB only (for offline mode)
+      const user: User = {
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        role,
+        companyId: currentCompany.id,
+        active: true
+      }
+
+      await offlineDB.put('users', user)
+
+      // Update local state
+      setUsers(prev => [...prev, user])
+
+      console.log('✅ Simple user added offline (fallback):', user.name)
+
+      return user
     }
-    
-    await offlineDB.put('users', user)
-    
-    // Update local state
-    setUsers(prev => [...prev, user])
-    
-    console.log('✅ Simple user added offline:', user.name)
-    
-    return user
   }
 
   const deleteUser = async (userId: string): Promise<void> => {
