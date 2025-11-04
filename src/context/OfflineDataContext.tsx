@@ -226,7 +226,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
       if (savedShowArchived) {
         setShowArchived(JSON.parse(savedShowArchived))
       }
-      
+
       const savedActiveTab = localStorage.getItem('anchorViewActiveTab')
       if (savedActiveTab) {
         setActiveTab(savedActiveTab)
@@ -235,6 +235,51 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
       console.warn('Failed to load persisted settings:', error)
     }
   }, [])
+
+  // Auto-sync pending items on boot if online
+  useEffect(() => {
+    const autoSyncOnBoot = async () => {
+      // Only run once when authenticated and online
+      if (!isAuthenticated || !currentCompany) return
+
+      // Check if we're online
+      const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : false
+      if (!isOnline) {
+        console.log('📱 Offline mode - skipping auto-sync on boot')
+        return
+      }
+
+      try {
+        // Import hybrid data manager dynamically
+        const { hybridDataManager } = await import('@/lib/hybrid-data-manager')
+        const pending = hybridDataManager.getPendingItems()
+
+        if (pending.total > 0) {
+          console.log(`🔄 Auto-sync on boot: Found ${pending.total} pending items (${pending.points} points, ${pending.tests} tests)`)
+
+          // Wait a bit to ensure everything is loaded
+          setTimeout(async () => {
+            try {
+              const result = await hybridDataManager.manualSync()
+              if (result.success) {
+                console.log(`✅ Auto-sync completed: ${result.synced} items synchronized`)
+              } else {
+                console.warn(`⚠️ Auto-sync completed with errors: ${result.errors.join(', ')}`)
+              }
+            } catch (error) {
+              console.error('❌ Auto-sync failed:', error)
+            }
+          }, 2000) // 2 second delay to ensure data is loaded
+        } else {
+          console.log('✅ No pending items to sync')
+        }
+      } catch (error) {
+        console.error('Failed to check pending items:', error)
+      }
+    }
+
+    autoSyncOnBoot()
+  }, [isAuthenticated, currentCompany])
 
   const refreshData = async (): Promise<void> => {
     if (!currentCompany || !currentUser) return
