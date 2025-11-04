@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { useDatabaseAuth } from '@/context/DatabaseAuthContext'
 
+// Force dynamic rendering (no pre-rendering)
+export const dynamic = 'force-dynamic'
+
 export default function LoginPage() {
   const { login } = useDatabaseAuth()
   const [email, setEmail] = useState('')
