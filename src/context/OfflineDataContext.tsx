@@ -434,13 +434,22 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
       if (savedUser) {
         console.log('✅ User created in database:', savedUser.id)
 
+        // Convert Date objects to strings for User type compatibility
+        const userForApp: User = {
+          ...savedUser,
+          createdAt: savedUser.createdAt instanceof Date ? savedUser.createdAt.toISOString() : savedUser.createdAt,
+          updatedAt: savedUser.updatedAt instanceof Date ? savedUser.updatedAt.toISOString() : savedUser.updatedAt,
+          lastLogin: savedUser.lastLogin instanceof Date ? savedUser.lastLogin.toISOString() : savedUser.lastLogin,
+          emailVerified: savedUser.emailVerified instanceof Date ? savedUser.emailVerified.toISOString() : savedUser.emailVerified
+        } as User
+
         // Also save to IndexedDB for offline access
-        await offlineDB.put('users', savedUser)
+        await offlineDB.put('users', userForApp)
 
         // Update local state
-        setUsers(prev => [...prev, savedUser])
+        setUsers(prev => [...prev, userForApp])
 
-        return savedUser
+        return userForApp
       }
 
       throw new Error('Failed to save user to database')
