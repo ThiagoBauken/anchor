@@ -125,18 +125,29 @@ export const authOptions: NextAuthOptions = {
 
       // For Google OAuth users who need to complete setup
       if (account?.provider === 'google' && token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          include: { company: true }
-        })
-
-        if (!dbUser) {
+        // Check if Prisma is available
+        if (!prisma) {
+          console.error('❌ Prisma client is null in jwt callback')
           token.needsCompanySetup = true
         } else {
-          token.role = dbUser.role
-          token.companyId = dbUser.companyId
-          token.company = dbUser.company
-          token.needsCompanySetup = false
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { email: token.email },
+              include: { company: true }
+            })
+
+            if (!dbUser) {
+              token.needsCompanySetup = true
+            } else {
+              token.role = dbUser.role
+              token.companyId = dbUser.companyId
+              token.company = dbUser.company
+              token.needsCompanySetup = false
+            }
+          } catch (error) {
+            console.error('❌ Database error in jwt callback:', error)
+            token.needsCompanySetup = true
+          }
         }
       }
 

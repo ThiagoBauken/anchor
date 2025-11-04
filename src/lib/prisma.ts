@@ -29,19 +29,39 @@ const createPrismaClient = () => {
     // Test connection immediately (async IIFE)
     ;(async () => {
       try {
+        console.log('🔄 Testing database connection...')
         await client.$connect()
+        await client.$queryRaw`SELECT 1`
         console.log('✅ Database connection successful')
+        console.log('✅ Database query test passed')
       } catch (error: any) {
         console.error('❌ Database connection failed:', error.message)
-        if (error.message.includes('authentication failed')) {
-          console.error('💡 Check your database credentials (username/password)')
+        console.error('📍 Connection string:', process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@'))
+
+        if (error.message.includes('authentication failed') || error.message.includes('password authentication failed')) {
+          console.error('💡 Authentication failed - Check your database credentials')
+          console.error('   - Username: Check POSTGRES_USER or DATABASE_URL username')
+          console.error('   - Password: Check POSTGRES_PASSWORD or DATABASE_URL password')
         }
-        if (error.message.includes('Connection refused')) {
-          console.error('💡 Check if PostgreSQL is running and accessible')
+        if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+          console.error('💡 Connection refused - Check if PostgreSQL is running')
+          console.error('   - Host: Verify the database host is accessible')
+          console.error('   - Port: Verify the port is correct (default: 5432)')
         }
-        if (error.message.includes('timeout')) {
-          console.error('💡 Check database host and network connectivity')
+        if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+          console.error('💡 Connection timeout - Network issue')
+          console.error('   - Check firewall rules')
+          console.error('   - Verify host/port are correct')
+          console.error('   - Check if the database server is online')
         }
+        if (error.message.includes('getaddrinfo ENOTFOUND') || error.message.includes('ENOTFOUND')) {
+          console.error('💡 Host not found - DNS resolution failed')
+          console.error('   - Check if the hostname is correct')
+          console.error('   - Try using an IP address instead')
+        }
+
+        console.error('⚠️  Application will run in localStorage fallback mode')
+        console.error('⚠️  Authentication features will not work without database connection')
       }
     })()
 
