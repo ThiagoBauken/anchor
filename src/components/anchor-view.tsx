@@ -2,7 +2,7 @@
 "use client";
 
 import { useOfflineData } from "@/context/OfflineDataContext";
-import { useOfflineAuthSafe } from "@/context/OfflineAuthContext";
+import { useDatabaseAuthSafe } from "@/context/DatabaseAuthContext";
 import { Mountain, ClipboardList, Map, TestTubeDiagonal, Users, FolderKanban, LayoutDashboard, ExternalLink, LogOut, MapPin, Shield, UsersRound, CloudUpload, Building2, Store } from "lucide-react";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { LoadingOverlay } from "./ui/loading-spinner";
@@ -34,9 +34,9 @@ import { TrialBanner } from "./trial-banner";
 import { TrialExpiredOverlay } from "./trial-expired-overlay";
 
 function UserProfile() {
-  const { currentUser, logout, isOnline } = useOfflineAuthSafe();
+  const { user: currentUser, logout } = useDatabaseAuthSafe();
   const router = useRouter();
-  
+
   if (!currentUser) return null;
 
   const isSuperAdmin = currentUser.role === 'superadmin';
@@ -54,8 +54,7 @@ function UserProfile() {
       <div className="text-left hidden sm:block">
         <p className="text-sm font-medium text-foreground">{currentUser.name || currentUser.email}</p>
         <p className="text-xs text-muted-foreground">
-          {isOnline ? 'Online' : 'Offline'} 
-          {isSuperAdmin && <span className="ml-1 text-yellow-600 dark:text-yellow-400">• Super Admin</span>}
+          {isSuperAdmin && <span className="text-yellow-600 dark:text-yellow-400">• Super Admin</span>}
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -65,7 +64,7 @@ function UserProfile() {
             <Shield className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout">
+        <Button variant="ghost" size="icon" onClick={logout} aria-label="Logout" title="Sair da Conta">
           <LogOut className="h-4 w-4" />
         </Button>
       </div>
