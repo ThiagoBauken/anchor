@@ -56,16 +56,33 @@ export async function getAuthenticatedUser(): Promise<User | null> {
  * TESTE DIAGNÓSTICO: Autenticação temporariamente desabilitada
  */
 export async function requireAuthentication(): Promise<User> {
-  // TESTE: Retorna mock user para testes sem autenticação
-  return {
-    id: 'mock-user-id',
-    email: 'test@test.com',
-    name: 'Test User',
-    role: 'superadmin',
-    companyId: 'mock-company-id',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  } as User;
+  // TESTE: Busca primeiro usuário do banco para usar como mock
+  // Isso evita erros de FK constraint ao acessar dados relacionados
+  try {
+    const firstUser = await prisma.user.findFirst({
+      include: {
+        company: true
+      }
+    });
+
+    if (firstUser) {
+      return {
+        id: firstUser.id,
+        email: firstUser.email,
+        name: firstUser.name || '',
+        role: firstUser.role as any,
+        companyId: firstUser.companyId,
+        company: firstUser.company as any,
+        createdAt: firstUser.createdAt.toISOString(),
+        updatedAt: firstUser.updatedAt.toISOString()
+      } as User;
+    }
+  } catch (error) {
+    console.error('[AuthHelpers] Error finding first user:', error);
+  }
+
+  // Fallback: se não encontrar usuário, retorna erro
+  throw new Error('No users found in database. Please create a user first.');
 
   /* ORIGINAL:
   const user = await getAuthenticatedUser();
