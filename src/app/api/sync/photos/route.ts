@@ -149,6 +149,17 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // 1. VERIFICAR AUTENTICAÇÃO
+    const authResult = await requireAuth(request);
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status || 401 }
+      );
+    }
+
+    const { user } = authResult;
+
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
 
@@ -159,11 +170,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Buscar fotos do banco de dados
+    // 2. VERIFICAR ACESSO AO PROJETO
+    const accessCheck = await requireProjectAccess(user!.id, projectId);
+    if (accessCheck.error) {
+      return NextResponse.json(
+        { error: accessCheck.error },
+        { status: accessCheck.status || 403 }
+      );
+    }
+
+    // 3. Buscar fotos do banco de dados
     const photos = await prisma.photo.findMany({
       where: { projectId },
       orderBy: { capturedAt: 'desc' }
     });
+
+    console.log(`[Sync Photos GET] User ${user!.email} retrieved ${photos.length} photos from project ${projectId}`);
 
     return NextResponse.json({
       success: true,
