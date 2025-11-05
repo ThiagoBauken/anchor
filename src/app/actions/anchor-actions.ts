@@ -2,6 +2,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { AnchorPoint, AnchorTest } from '@/types';
+import { requireAuthentication, requireProjectAccess, logAction } from '@/lib/auth-helpers';
+import { canCreatePoints, canDeletePoints } from '@/lib/permissions';
 
 // =====================================
 // ANCHOR POINTS ACTIONS
@@ -10,6 +12,10 @@ import { AnchorPoint, AnchorTest } from '@/types';
 // Buscar pontos de ancoragem de um projeto
 export async function getAnchorPointsForProject(projectId: string) {
   try {
+    // Verificar autenticação e acesso ao projeto
+    const user = await requireAuthentication();
+    await requireProjectAccess(user.id, projectId);
+
     const points = await prisma.anchorPoint.findMany({
       where: { 
         projectId,
@@ -56,14 +62,31 @@ export async function getArchivedAnchorPointsForProject(projectId: string) {
 // Adicionar novo ponto de ancoragem
 export async function addAnchorPoint(pointData: Omit<AnchorPoint, 'id' | 'dataHora' | 'status' | 'createdByUserId' | 'lastModifiedByUserId' | 'archived'>, userId?: string) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Validar acesso ao projeto
+    await requireProjectAccess(user.id, pointData.projectId);
+
+    // 3. Verificar permissão para criar pontos
+    if (!canCreatePoints({ user, projectId: pointData.projectId })) {
+      throw new Error('Permission denied: Cannot create anchor points');
+    }
+
+    // 4. Log de auditoria
+    logAction('CREATE_ANCHOR_POINT', user.id, {
+      projectId: pointData.projectId,
+      numeroPonto: pointData.numeroPonto
+    });
+
     const newPoint = await prisma.anchorPoint.create({
       data: {
         ...pointData,
         posicaoX: Number(pointData.posicaoX),
         posicaoY: Number(pointData.posicaoY),
         status: 'Não Testado',
-        createdByUserId: userId,
-        lastModifiedByUserId: userId,
+        createdByUserId: user.id,  // Usar user autenticado
+        lastModifiedByUserId: user.id,
         archived: false,
         dataHora: new Date(),
         frequenciaInspecaoMeses: pointData.frequenciaInspecaoMeses || null
