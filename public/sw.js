@@ -1,10 +1,14 @@
 // AnchorView Service Worker - Offline-First PWA
-// Funcionalidades: Cache completo, Background Sync, IndexedDB sync, Push Notifications
+// Funcionalidades: Cache completo, Background Sync, IndexedDB sync, Push Notifications, JWT Auth
 
-const CACHE_NAME = 'anchorview-v3'
-const STATIC_CACHE = 'anchorview-static-v3'
-const DYNAMIC_CACHE = 'anchorview-dynamic-v3'
-const API_CACHE = 'anchorview-api-v3'
+const CACHE_NAME = 'anchorview-v4'
+const STATIC_CACHE = 'anchorview-static-v4'
+const DYNAMIC_CACHE = 'anchorview-dynamic-v4'
+const API_CACHE = 'anchorview-api-v4'
+
+// JWT Token Cache (armazenado em memória)
+let jwtToken = null
+let tokenExpiry = null
 
 // Arquivos para cache estático (essenciais para funcionamento offline)
 const STATIC_FILES = [
@@ -41,7 +45,7 @@ const ROUTE_CONFIGS = [
 
 // Instalar Service Worker
 self.addEventListener('install', (event) => {
-  console.log('🔧 Service Worker: Instalando v2...')
+  console.log('🔧 Service Worker: Instalando v4 (com JWT Auth)...')
   
   event.waitUntil(
     Promise.all([
@@ -63,7 +67,7 @@ self.addEventListener('install', (event) => {
 
 // Ativar Service Worker
 self.addEventListener('activate', (event) => {
-  console.log('✅ Service Worker: Ativando v2...')
+  console.log('✅ Service Worker: Ativando v4 (com JWT Auth)...')
   
   event.waitUntil(
     Promise.all([
@@ -353,76 +357,187 @@ async function syncOfflineData() {
   }
 }
 
-// Executar operação de sync no servidor
+// ===== JWT AUTHENTICATION =====
+
+/**
+ * Busca um novo JWT token do servidor
+ * Requer que o usuário esteja autenticado (session cookie)
+ */
+async function fetchNewJWTToken() {
+  try {
+    console.log('🔑 Service Worker: Buscando novo JWT token...')
+
+    const response = await fetch('/api/auth/sync-token', {
+      method: 'POST',
+      credentials: 'include' // Inclui cookies de sessão
+    })
+
+    if (!response.ok) {
+      console.error('❌ Service Worker: Falha ao obter JWT token:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+
+    jwtToken = data.token
+    tokenExpiry = new Date(data.expiresAt).getTime()
+
+    console.log('✅ Service Worker: JWT token obtido com sucesso')
+    console.log('⏰ Service Worker: Token expira em:', new Date(tokenExpiry).toLocaleString())
+
+    return jwtToken
+
+  } catch (error) {
+    console.error('❌ Service Worker: Erro ao buscar JWT token:', error)
+    return null
+  }
+}
+
+/**
+ * Garante que temos um token JWT válido
+ * Busca novo token se não existe ou está expirado
+ */
+async function ensureValidToken() {
+  const now = Date.now()
+
+  // Se não tem token ou está expirado (ou expirando nos próximos 5 min)
+  if (!jwtToken || !tokenExpiry || tokenExpiry - now < 5 * 60 * 1000) {
+    console.log('🔄 Service Worker: Token inválido ou expirando, renovando...')
+    return await fetchNewJWTToken()
+  }
+
+  return jwtToken
+}
+
+/**
+ * Cria headers com autenticação JWT
+ */
+function createAuthHeaders(additionalHeaders = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...additionalHeaders
+  }
+
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${jwtToken}`
+  }
+
+  return headers
+}
+
+// ===== END JWT AUTHENTICATION =====
+
+// Executar operação de sync no servidor (COM AUTENTICAÇÃO JWT)
 async function executeServerSync(syncItem) {
   try {
     const { table, operation, data } = syncItem
-    
+
+    // IMPORTANTE: Garantir token válido antes de sincronizar
+    const token = await ensureValidToken()
+
+    if (!token) {
+      console.error('❌ Service Worker: Não foi possível obter token JWT para sync')
+      return false
+    }
+
     let response
-    
+
     switch (operation) {
       case 'create':
         response = await fetch(`/api/sync/${table}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: createAuthHeaders(),
           body: JSON.stringify(data)
         })
         break
-        
+
       case 'update':
         response = await fetch(`/api/sync/${table}/${data.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: createAuthHeaders(),
           body: JSON.stringify(data)
         })
         break
-        
+
       case 'delete':
         response = await fetch(`/api/sync/${table}/${data.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: createAuthHeaders()
         })
         break
-        
+
       default:
         return false
     }
-    
+
+    // Se token expirou durante a operação, tentar renovar e fazer retry
+    if (response.status === 401) {
+      console.log('🔄 Service Worker: Token expirado, renovando e tentando novamente...')
+      jwtToken = null // Forçar renovação
+      const newToken = await ensureValidToken()
+
+      if (newToken) {
+        // Retry da operação com novo token
+        return await executeServerSync(syncItem)
+      }
+    }
+
     return response.ok
-    
+
   } catch (error) {
-    console.error('Server sync error:', error)
+    console.error('❌ Service Worker: Erro no sync:', error)
     return false
   }
 }
 
-// Sincronizar arquivos offline
+// Sincronizar arquivos offline (COM AUTENTICAÇÃO JWT)
 async function syncOfflineFiles() {
   try {
     console.log('📎 Service Worker: Iniciando sync de arquivos...')
-    
+
+    // IMPORTANTE: Garantir token válido antes de sincronizar
+    const token = await ensureValidToken()
+
+    if (!token) {
+      console.error('❌ Service Worker: Não foi possível obter token JWT para sync de arquivos')
+      return
+    }
+
     const db = await openIndexedDB()
     const files = await getFilesToUpload(db)
-    
+
+    console.log(`📤 Service Worker: Enviando ${files.length} arquivos`)
+
     for (const file of files) {
       try {
         const formData = new FormData()
         formData.append('file', file.blob, file.filename)
         formData.append('id', file.id)
-        
+
         const response = await fetch('/api/upload', {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwtToken}` // Adicionar JWT
+            // Não adicionar Content-Type para FormData (browser define automaticamente)
+          },
           body: formData
         })
-        
+
         if (response.ok) {
           const result = await response.json()
           await markFileAsUploaded(db, file.id, result.url)
+          console.log(`✅ Service Worker: Arquivo ${file.filename} enviado com sucesso`)
+        } else if (response.status === 401) {
+          console.log('🔄 Service Worker: Token expirado no upload, renovando...')
+          jwtToken = null // Forçar renovação
+          // Token será renovado na próxima tentativa de sync
+          break // Sair do loop para tentar novamente no próximo sync
         }
       } catch (error) {
-        console.error('File upload error:', error)
+        console.error('❌ Service Worker: Erro no upload:', error)
       }
     }
-    
+
   } catch (error) {
     console.error('❌ Service Worker: Erro no sync de arquivos:', error)
   }
@@ -560,4 +675,5 @@ async function notifyClients(type, data) {
   })
 }
 
-console.log('🚀 Service Worker v2: Carregado e pronto para funcionar offline!')
+console.log('🚀 Service Worker v4: Carregado com JWT Authentication!')
+console.log('🔐 Service Worker v4: Background sync protegido com autenticação')
