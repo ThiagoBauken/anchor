@@ -546,7 +546,7 @@ export async function deletePathologyMarker(markerId: string) {
 export async function getReportsForInspection(inspectionId: string) {
   try {
     const reports = await prisma.inspectionReport.findMany({
-      where: { inspectionId: inspectionId },
+      where: { facadeInspectionId: inspectionId },
       include: {
         engineer: {
           select: {
@@ -582,14 +582,14 @@ export async function createInspectionReport(
   try {
     // Get the next version number
     const latestReport = await prisma.inspectionReport.findFirst({
-      where: { inspectionId: inspectionId },
+      where: { facadeInspectionId: inspectionId },
       orderBy: { version: 'desc' }
     });
     const nextVersion = (latestReport?.version || 0) + 1;
 
     const report = await prisma.inspectionReport.create({
       data: {
-        inspectionId: inspectionId,
+        facadeInspectionId: inspectionId,
         engineerId,
         reportNumber,
         title,
