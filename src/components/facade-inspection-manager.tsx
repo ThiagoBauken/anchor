@@ -87,21 +87,29 @@ export function FacadeInspectionManager({
 
   const loadData = async () => {
     setLoading(true);
-    const [inspectionsData, categoriesData] = await Promise.all([
-      getInspectionsForProject(projectId),
-      getPathologyCategoriesForProject(projectId)
-    ]);
+    try {
+      const [inspectionsData, categoriesData] = await Promise.all([
+        getInspectionsForProject(projectId),
+        getPathologyCategoriesForProject(projectId)
+      ]);
 
-    setInspections(inspectionsData as any);
-    setCategories(categoriesData as any);
+      setInspections(inspectionsData as any);
+      setCategories(categoriesData as any);
 
-    // Seed default categories if none exist
-    if (categoriesData.length === 0) {
-      const seededCategories = await seedDefaultPathologyCategories(projectId);
-      setCategories(seededCategories as any);
+      // Seed default categories if none exist
+      if (categoriesData.length === 0) {
+        const seededCategories = await seedDefaultPathologyCategories(projectId);
+        setCategories(seededCategories as any);
+      }
+    } catch (error) {
+      console.error('❌ Error loading facade inspections:', error);
+      // Set empty arrays on error so UI shows "no inspections" instead of eternal loading
+      setInspections([]);
+      setCategories([]);
+    } finally {
+      // Always stop loading, even if there's an error
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   // Load markers for selected facade side

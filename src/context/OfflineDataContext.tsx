@@ -199,9 +199,20 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
         setFloorPlans(convertedFloorPlans)
         console.log('✅ Floor plans loaded:', convertedFloorPlans.length)
 
-        // Reset current floor plan if it doesn't belong to this project
+        // Auto-select floor plan logic:
+        // 1. If current floor plan doesn't belong to this project, clear it
+        // 2. If no floor plan selected, auto-select first active one
         if (currentFloorPlan && currentFloorPlan.projectId !== currentProject.id) {
           setCurrentFloorPlan(null)
+        }
+
+        // Auto-select first floor plan if none is selected
+        if (!currentFloorPlan && convertedFloorPlans.length > 0) {
+          // Prefer first active floor plan
+          const firstActive = convertedFloorPlans.find(fp => fp.active)
+          const floorPlanToSelect = firstActive || convertedFloorPlans[0]
+          setCurrentFloorPlan(floorPlanToSelect)
+          console.log('🎯 Auto-selected floor plan:', floorPlanToSelect.name)
         }
       } catch (error) {
         console.error('❌ Error loading floor plans:', error)
