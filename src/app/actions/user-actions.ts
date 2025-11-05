@@ -5,7 +5,7 @@ import { User, UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { localStorageUsers } from '@/lib/localStorage-fallback';
 import { requireAuthentication, requireCompanyMatch, requireRole, logAction } from '@/lib/auth-helpers';
-import { canInviteUsers, canManageUsers } from '@/lib/permissions';
+import { canInviteUsers, canManageTeams } from '@/lib/permissions';
 
 export async function getUsersForCompany(companyId: string): Promise<User[]> {
   console.log('[DEBUG] getUsersForCompany server action called:', { companyId });
@@ -44,7 +44,7 @@ export async function addUser(
     await requireCompanyMatch(user.id, companyId);
 
     // Verificar permissão para convidar usuários com o role especificado
-    if (!canInviteUsers({ user, roleToInvite: role })) {
+    if (!canInviteUsers({ user }, role)) {
       throw new Error(`Permission denied: Cannot invite users with role ${role}`);
     }
 
@@ -102,7 +102,8 @@ export async function deleteUser(id: string): Promise<boolean> {
   await requireCompanyMatch(user.id, targetUser.companyId);
 
   // Verificar permissão para gerenciar usuários
-  if (!canManageUsers({ user })) {
+  // Usar canManageTeams como proxy para gerenciar usuários (superadmin e company_admin)
+  if (!canManageTeams({ user })) {
     throw new Error('Permission denied: Cannot delete users');
   }
 

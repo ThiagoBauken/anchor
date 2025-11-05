@@ -122,7 +122,6 @@ export function InteractiveMap({
       img.onerror = () => {
         // Fallback if image fails to load
         console.error('[InteractiveMap] Failed to load floor plan image:', {
-          floorPlanName: currentFloorPlan?.name,
           hasImage: !!floorPlanImage,
           imageLength: floorPlanImage?.length,
           imageStart: floorPlanImage?.substring(0, 50)

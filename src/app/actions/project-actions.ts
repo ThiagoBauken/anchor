@@ -6,7 +6,7 @@ import type { MarkerShape } from '@/types';
 import { prisma } from '@/lib/prisma';
 import { localStorageProjects, localStorageLocations } from '@/lib/localStorage-fallback';
 import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
-import { canManageProjects, canDeleteProjects } from '@/lib/permissions';
+import { canCreateProjects, canDeletePoints } from '@/lib/permissions';
 
 // == PROJECTS ==
 export async function getProjectsForCompany(companyId: string): Promise<Project[]> {
@@ -110,7 +110,7 @@ export async function addProject(projectData: Omit<Project, 'id' | 'deleted' | '
   await requireCompanyMatch(user.id, projectData.companyId);
 
   // Verificar permissão para criar projetos
-  if (!canManageProjects({ user })) {
+  if (!canCreateProjects({ user })) {
     throw new Error('Permission denied: Cannot create projects');
   }
 
@@ -174,7 +174,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   await requireCompanyMatch(user.id, project.companyId);
 
   // Verificar permissão para deletar projetos
-  if (!canDeleteProjects({ user })) {
+  if (!canDeletePoints({ user })) {
     throw new Error('Permission denied: Cannot delete projects');
   }
 
@@ -231,7 +231,7 @@ export async function addLocation(name: string, markerShape: MarkerShape, compan
     await requireCompanyMatch(user.id, companyId);
 
     // Verificar permissão (precisa poder gerenciar projetos para criar locations)
-    if (!canManageProjects({ user })) {
+    if (!canCreateProjects({ user })) {
       throw new Error('Permission denied: Cannot create locations');
     }
 
@@ -273,7 +273,7 @@ export async function deleteLocation(id: string): Promise<boolean> {
     await requireCompanyMatch(user.id, location.companyId);
 
     // Verificar permissão
-    if (!canDeleteProjects({ user })) {
+    if (!canDeletePoints({ user })) {
       throw new Error('Permission denied: Cannot delete locations');
     }
 
@@ -314,7 +314,7 @@ export async function updateLocationShape(id: string, markerShape: MarkerShape):
     await requireCompanyMatch(user.id, location.companyId);
 
     // Verificar permissão
-    if (!canManageProjects({ user })) {
+    if (!canCreateProjects({ user })) {
       throw new Error('Permission denied: Cannot update locations');
     }
 

@@ -320,7 +320,7 @@ class OfflineDB {
   async updatePoint(point: AnchorPoint): Promise<void> {
     await this.put('anchor_points', {
       ...point,
-      lastSyncAt: new Date().toISOString()
+      lastSyncedAt: new Date().toISOString()
     })
   }
 

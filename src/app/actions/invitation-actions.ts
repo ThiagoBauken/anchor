@@ -154,7 +154,7 @@ export async function acceptProjectInvitation(notificationId: string, userId: st
         data: {
           teamId: team.id,
           userId: userId,
-          role: 'owner',
+          role: 'leader',  // TeamMemberRole: leader | member | observer
           active: true
         }
       })

@@ -144,7 +144,7 @@ export async function createFacadeInspection(
         scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
         inspectorName,
         engineerId,
-        createdById: createdByUserId
+        createdByUserId: createdByUserId
       },
       include: {
         facadeSides: true,
@@ -218,7 +218,7 @@ export async function deleteFacadeInspection(inspectionId: string) {
 export async function getFacadeSidesForInspection(inspectionId: string) {
   try {
     const sides = await prisma.facadeSide.findMany({
-      where: { facadeInspectionId: inspectionId },
+      where: { inspectionId: inspectionId },
       include: {
         pathologyMarkers: {
           include: {
@@ -254,7 +254,7 @@ export async function createFacadeSide(
   try {
     const side = await prisma.facadeSide.create({
       data: {
-        facadeInspectionId: inspectionId,
+        inspectionId: inspectionId,
         name,
         sideType,
         image,
@@ -546,7 +546,7 @@ export async function deletePathologyMarker(markerId: string) {
 export async function getReportsForInspection(inspectionId: string) {
   try {
     const reports = await prisma.inspectionReport.findMany({
-      where: { facadeInspectionId: inspectionId },
+      where: { inspectionId: inspectionId },
       include: {
         engineer: {
           select: {
@@ -582,14 +582,14 @@ export async function createInspectionReport(
   try {
     // Get the next version number
     const latestReport = await prisma.inspectionReport.findFirst({
-      where: { facadeInspectionId: inspectionId },
+      where: { inspectionId: inspectionId },
       orderBy: { version: 'desc' }
     });
     const nextVersion = (latestReport?.version || 0) + 1;
 
     const report = await prisma.inspectionReport.create({
       data: {
-        facadeInspectionId: inspectionId,
+        inspectionId: inspectionId,
         engineerId,
         reportNumber,
         title,

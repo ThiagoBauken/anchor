@@ -356,8 +356,8 @@ export async function addAnchorTest(testData: Omit<AnchorTest, 'id' | 'dataHora'
     const newTest = await prisma.anchorTest.create({
       data: {
         ...testData,
-        dataHora: new Date(),
-        createdByUserId: user.id  // Usar user autenticado
+        dataHora: new Date()
+        // Note: AnchorTest não tem campo createdByUserId no schema
       }
     });
 
