@@ -121,6 +121,12 @@ export function InteractiveMap({
       };
       img.onerror = () => {
         // Fallback if image fails to load
+        console.error('[InteractiveMap] Failed to load floor plan image:', {
+          floorPlanName: currentFloorPlan?.name,
+          hasImage: !!floorPlanImage,
+          imageLength: floorPlanImage?.length,
+          imageStart: floorPlanImage?.substring(0, 50)
+        });
         const dims = { width: 1200, height: 900 };
         setMapDimensions(dims);
         setViewBox({ x: 0, y: 0, width: dims.width, height: dims.height });
@@ -133,8 +139,13 @@ export function InteractiveMap({
   }, [updateMapDimensions]);
 
 
-  if (!floorPlanImage) {
-    console.log('[DEBUG] No floor plan image provided');
+  // Validação melhorada para detectar strings vazias e formatos inválidos
+  if (!floorPlanImage || floorPlanImage.trim() === '' || !floorPlanImage.startsWith('data:image')) {
+    console.log('[DEBUG] No valid floor plan image provided:', {
+      hasImage: !!floorPlanImage,
+      isEmpty: floorPlanImage?.trim() === '',
+      isValidFormat: floorPlanImage?.startsWith('data:image')
+    });
     return (
       <div className="flex items-center justify-center h-full p-8 border-2 border-dashed rounded-lg">
         <p className="text-muted-foreground">Nenhuma planta baixa selecionada. Adicione uma na aba 'Projetos'.</p>

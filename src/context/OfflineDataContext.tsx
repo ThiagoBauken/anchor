@@ -190,7 +190,10 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
           active: fp.active,
           createdAt: new Date(fp.createdAt).toISOString(),
           updatedAt: new Date(fp.updatedAt).toISOString(),
-          anchorPoints: []
+          // Criar array com tamanho correto baseado em _count
+          anchorPoints: new Array((fp as any)._count?.anchorPoints || 0)
+            .fill(null)
+            .map((_, idx) => ({ id: `placeholder-${idx}` } as any))
         }))
 
         setFloorPlans(convertedFloorPlans)

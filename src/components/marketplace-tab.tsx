@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Building2, Phone, Mail, MapPin, Users, Calendar, Shield, FileText, ExternalLink, Send } from 'lucide-react'
+import { Building2, Phone, Mail, MapPin, Users, Calendar, Shield, FileText, ExternalLink, Send, AlertCircle } from 'lucide-react'
 import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
 import { useOfflineData } from '@/context/OfflineDataContext'
 import { getClimbingCompanies } from '@/app/actions/marketplace-actions'
@@ -59,6 +59,7 @@ export function MarketplaceTab() {
   const { toast } = useToast()
   const [companies, setCompanies] = useState<ClimbingCompany[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null)
 
   // Invitation dialog state
@@ -74,11 +75,13 @@ export function MarketplaceTab() {
 
   async function loadCompanies() {
     setIsLoading(true)
+    setError(null)
     try {
       const data = await getClimbingCompanies()
       setCompanies(data)
     } catch (error) {
       console.error('Error loading climbing companies:', error)
+      setError('Erro ao carregar empresas. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -168,7 +171,29 @@ export function MarketplaceTab() {
           </p>
         </div>
 
-        {companies.length === 0 && !isLoading && (
+        {error && (
+          <Card className="border-destructive">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive">Erro ao Carregar</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={loadCompanies}
+                  >
+                    Tentar Novamente
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {companies.length === 0 && !isLoading && !error && (
           <Card>
             <CardContent className="p-8 text-center">
               <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />

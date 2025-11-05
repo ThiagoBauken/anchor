@@ -115,7 +115,7 @@ export async function getClimbingCompanies() {
 
       // Company stats
       projectsCount: company.projects.length,
-      usersCount: company.usersCount
+      usersCount: company.users.length  // ← CORRIGIDO: Contar usuários reais ao invés do campo denormalizado
     }))
   } catch (error) {
     console.error('Error fetching climbing companies:', error)

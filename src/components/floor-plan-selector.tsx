@@ -40,7 +40,6 @@ export function FloorPlanSelector({
   const [newFloorPlanOrder, setNewFloorPlanOrder] = useState(0);
 
   const sortedFloorPlans = [...floorPlans].sort((a, b) => a.order - b.order);
-  const activeFloorPlans = sortedFloorPlans.filter(fp => fp.active);
   const activeFloorPlan = floorPlans.find(fp => fp.id === activeFloorPlanId);
 
   const handleAddFloorPlan = async () => {
@@ -98,10 +97,17 @@ export function FloorPlanSelector({
               <span className="font-medium">Todas as plantas</span>
             </div>
           </SelectItem>
-          {activeFloorPlans.map((floorPlan) => (
-            <SelectItem key={floorPlan.id} value={floorPlan.id}>
+          {sortedFloorPlans.map((floorPlan) => (
+            <SelectItem
+              key={floorPlan.id}
+              value={floorPlan.id}
+              disabled={!floorPlan.active}
+            >
               <div className="flex items-center gap-2">
                 <span>{floorPlan.name}</span>
+                {!floorPlan.active && (
+                  <span className="text-xs text-muted-foreground">(Inativa)</span>
+                )}
                 <span className="text-xs text-muted-foreground">
                   ({floorPlan.anchorPoints?.length || 0} pontos)
                 </span>

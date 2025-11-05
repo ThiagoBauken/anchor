@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { requireAuth, requireProjectAccess } from '@/middleware/auth-middleware';
 
 const prisma = new PrismaClient();
 
@@ -25,6 +26,18 @@ const prisma = new PrismaClient();
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. VERIFICAR AUTENTICAÇÃO
+    const authResult = await requireAuth(request);
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status || 401 }
+      );
+    }
+
+    const { user } = authResult;
+    console.log(`[Sync Photos] Authenticated user: ${user!.email}`);
+
     const body = await request.json();
 
     const {
@@ -45,6 +58,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 2. VERIFICAR ACESSO AO PROJETO
+    const accessCheck = await requireProjectAccess(user!.id, projectId);
+    if (accessCheck.error) {
+      return NextResponse.json(
+        { error: accessCheck.error },
+        { status: accessCheck.status || 403 }
+      );
+    }
+
+    console.log(`[Sync Photos] User ${user!.email} has access to project ${projectId}`);
 
     // Verifica se é data URL válido
     if (!photoData.startsWith('data:image/')) {

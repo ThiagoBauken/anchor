@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { requireAuth, requireProjectAccess } from '@/middleware/auth-middleware';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +19,18 @@ const prisma = new PrismaClient();
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. VERIFICAR AUTENTICAÇÃO
+    const authResult = await requireAuth(request);
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status || 401 }
+      );
+    }
+
+    const { user } = authResult;
+    console.log(`[Sync AnchorData] Authenticated user: ${user!.email}`);
+
     const body = await request.json();
     const { anchorPoints, anchorTests } = body;
 
@@ -26,6 +39,39 @@ export async function POST(request: NextRequest) {
       testsSaved: 0,
       errors: [] as string[]
     };
+
+    // 2. VERIFICAR ACESSO AOS PROJETOS
+    const projectIds = new Set<string>();
+    if (anchorPoints && Array.isArray(anchorPoints)) {
+      anchorPoints.forEach(point => {
+        if (point.projectId) projectIds.add(point.projectId);
+      });
+    }
+    if (anchorTests && Array.isArray(anchorTests)) {
+      for (const test of anchorTests) {
+        // Buscar projectId do ponto de ancoragem
+        if (test.anchorPointId) {
+          const point = await prisma.anchorPoint.findUnique({
+            where: { id: test.anchorPointId },
+            select: { projectId: true }
+          });
+          if (point?.projectId) projectIds.add(point.projectId);
+        }
+      }
+    }
+
+    // Verificar acesso a cada projeto
+    for (const projectId of projectIds) {
+      const accessCheck = await requireProjectAccess(user!.id, projectId);
+      if (accessCheck.error) {
+        return NextResponse.json(
+          { error: `${accessCheck.error} (Project: ${projectId})` },
+          { status: accessCheck.status || 403 }
+        );
+      }
+    }
+
+    console.log(`[Sync AnchorData] User ${user!.email} has access to ${projectIds.size} project(s)`);
 
     // Processa pontos de ancoragem
     if (anchorPoints && Array.isArray(anchorPoints)) {

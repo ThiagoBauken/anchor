@@ -190,7 +190,7 @@ export function FacadeInspectionManager({
     if (!newCategoryName.trim()) return;
 
     const category = await createPathologyCategory(
-      companyId,
+      projectId,  // ← CORRIGIDO: Deve ser projectId, não companyId
       newCategoryName,
       newCategoryColor,
       newCategorySeverity,
