@@ -146,8 +146,6 @@ export function MarketplaceTab() {
     }
   }
 
-  // TESTE DIAGNÓSTICO: Restrição de acesso temporariamente removida
-  /* ORIGINAL:
   // Only company_admin and superadmin can access marketplace
   if (currentUser?.role !== 'company_admin' && currentUser?.role !== 'superadmin') {
     return (
@@ -162,7 +160,6 @@ export function MarketplaceTab() {
       </Card>
     )
   }
-  */
 
   return (
     <LoadingOverlay isLoading={isLoading} text="Carregando empresas de alpinismo...">
