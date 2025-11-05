@@ -26,7 +26,8 @@ export function FacadesTab() {
     return null;
   }
 
-  const canEdit = currentUser.role === 'superadmin' || currentUser.role === 'company_admin' || currentUser.role === 'team_admin';
+  // TESTE DIAGNÓSTICO: Permissão temporariamente removida para testar mapa/fachadas
+  const canEdit = true; // ORIGINAL: currentUser.role === 'superadmin' || currentUser.role === 'company_admin' || currentUser.role === 'team_admin';
 
   return (
     <div className="space-y-6">
