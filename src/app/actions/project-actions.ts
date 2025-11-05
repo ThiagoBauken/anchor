@@ -5,6 +5,8 @@ import { Project, Location } from '@prisma/client';
 import type { MarkerShape } from '@/types';
 import { prisma } from '@/lib/prisma';
 import { localStorageProjects, localStorageLocations } from '@/lib/localStorage-fallback';
+import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
+import { canManageProjects, canDeleteProjects } from '@/lib/permissions';
 
 // == PROJECTS ==
 export async function getProjectsForCompany(companyId: string): Promise<Project[]> {
@@ -13,6 +15,10 @@ export async function getProjectsForCompany(companyId: string): Promise<Project[
     console.warn('[WARN] getProjectsForCompany: No companyId provided');
     return [];
   }
+
+  // Autenticação e validação
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, companyId);
 
   try {
     if (!prisma) {
@@ -41,6 +47,16 @@ export async function getProjectsForUser(userId: string, companyId: string): Pro
     console.warn('[WARN] getProjectsForUser: Missing userId or companyId');
     return [];
   }
+
+  // Autenticação e validação
+  const user = await requireAuthentication();
+
+  // Validar que o user está solicitando seus próprios projetos ou tem permissão
+  if (user.id !== userId && user.role !== 'superadmin') {
+    throw new Error('Permission denied: Cannot access other user projects');
+  }
+
+  await requireCompanyMatch(user.id, companyId);
 
   try {
     if (!prisma) {
@@ -88,6 +104,22 @@ export async function getProjectsForUser(userId: string, companyId: string): Pro
 
 export async function addProject(projectData: Omit<Project, 'id' | 'deleted' | 'createdAt' | 'updatedAt'>): Promise<Project | null> {
   console.log('[DEBUG] addProject server action called:', { projectName: projectData.name, companyId: projectData.companyId });
+
+  // Autenticação e validação
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, projectData.companyId);
+
+  // Verificar permissão para criar projetos
+  if (!canManageProjects({ user })) {
+    throw new Error('Permission denied: Cannot create projects');
+  }
+
+  // Log de auditoria
+  logAction('CREATE_PROJECT', user.id, {
+    projectName: projectData.name,
+    companyId: projectData.companyId
+  });
+
   try {
     if (!prisma) {
       console.warn('[WARN] Prisma client not initialized, using localStorage fallback');
@@ -124,12 +156,37 @@ export async function addProject(projectData: Omit<Project, 'id' | 'deleted' | '
 
 export async function deleteProject(id: string): Promise<boolean> {
   console.log('[DEBUG] deleteProject server action called:', { id });
+
+  // Autenticação
+  const user = await requireAuthentication();
+
+  // Buscar projeto para validar permissões
+  const project = await prisma?.project.findUnique({
+    where: { id },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  // Validar acesso à company
+  await requireCompanyMatch(user.id, project.companyId);
+
+  // Verificar permissão para deletar projetos
+  if (!canDeleteProjects({ user })) {
+    throw new Error('Permission denied: Cannot delete projects');
+  }
+
+  // Log de auditoria
+  logAction('DELETE_PROJECT', user.id, { projectId: id });
+
   try {
     if (!prisma) {
       console.warn('Database not available, using localStorage fallback');
       return localStorageProjects.delete(id);
     }
-    
+
     await prisma.project.update({
       where: { id },
       data: { deleted: true },
@@ -145,7 +202,11 @@ export async function deleteProject(id: string): Promise<boolean> {
 // == LOCATIONS ==
 export async function getLocationsForCompany(companyId: string): Promise<Location[]> {
   if (!companyId) return [];
-  
+
+  // Autenticação e validação
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, companyId);
+
   try {
     if (!prisma) {
       console.warn('Database not available, using localStorage fallback');
@@ -164,6 +225,19 @@ export async function getLocationsForCompany(companyId: string): Promise<Locatio
 
 export async function addLocation(name: string, markerShape: MarkerShape, companyId: string): Promise<Location | null> {
     console.log('[DEBUG] addLocation server action called:', { name, markerShape, companyId });
+
+    // Autenticação e validação
+    const user = await requireAuthentication();
+    await requireCompanyMatch(user.id, companyId);
+
+    // Verificar permissão (precisa poder gerenciar projetos para criar locations)
+    if (!canManageProjects({ user })) {
+      throw new Error('Permission denied: Cannot create locations');
+    }
+
+    // Log de auditoria
+    logAction('CREATE_LOCATION', user.id, { name, companyId });
+
     try {
         if (!prisma) {
             console.warn('Database not available, using localStorage fallback');
@@ -182,12 +256,36 @@ export async function addLocation(name: string, markerShape: MarkerShape, compan
 }
 
 export async function deleteLocation(id: string): Promise<boolean> {
+    // Autenticação
+    const user = await requireAuthentication();
+
+    // Buscar location para validar companyId
+    const location = await prisma?.location.findUnique({
+      where: { id },
+      select: { companyId: true }
+    });
+
+    if (!location) {
+      throw new Error('Location not found');
+    }
+
+    // Validar acesso à company
+    await requireCompanyMatch(user.id, location.companyId);
+
+    // Verificar permissão
+    if (!canDeleteProjects({ user })) {
+      throw new Error('Permission denied: Cannot delete locations');
+    }
+
+    // Log de auditoria
+    logAction('DELETE_LOCATION', user.id, { locationId: id });
+
     try {
         if (!prisma) {
             console.warn('Database not available, using localStorage fallback');
             return localStorageLocations.delete(id);
         }
-        
+
         await prisma.location.delete({ where: { id }});
         return true;
     } catch (e) {
@@ -198,6 +296,31 @@ export async function deleteLocation(id: string): Promise<boolean> {
 
 export async function updateLocationShape(id: string, markerShape: MarkerShape): Promise<Location | null> {
     console.log('[DEBUG] updateLocationShape action called:', { id, markerShape });
+
+    // Autenticação
+    const user = await requireAuthentication();
+
+    // Buscar location para validar companyId
+    const location = await prisma?.location.findUnique({
+      where: { id },
+      select: { companyId: true }
+    });
+
+    if (!location) {
+      throw new Error('Location not found');
+    }
+
+    // Validar acesso à company
+    await requireCompanyMatch(user.id, location.companyId);
+
+    // Verificar permissão
+    if (!canManageProjects({ user })) {
+      throw new Error('Permission denied: Cannot update locations');
+    }
+
+    // Log de auditoria
+    logAction('UPDATE_LOCATION', user.id, { locationId: id, markerShape });
+
     try {
         if (!prisma) {
             console.warn('Database not available, using localStorage fallback');

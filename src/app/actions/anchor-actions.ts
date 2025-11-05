@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { AnchorPoint, AnchorTest } from '@/types';
 import { requireAuthentication, requireProjectAccess, logAction } from '@/lib/auth-helpers';
-import { canCreatePoints, canDeletePoints } from '@/lib/permissions';
+import { canCreatePoints, canDeletePoints, canEditMap, canPerformTests } from '@/lib/permissions';
 
 // =====================================
 // ANCHOR POINTS ACTIONS
@@ -39,6 +39,10 @@ export async function getAnchorPointsForProject(projectId: string) {
 // Buscar pontos arquivados
 export async function getArchivedAnchorPointsForProject(projectId: string) {
   try {
+    // Verificar autenticação e acesso ao projeto
+    const user = await requireAuthentication();
+    await requireProjectAccess(user.id, projectId);
+
     const points = await prisma.anchorPoint.findMany({
       where: { 
         projectId,
@@ -108,13 +112,40 @@ export async function addAnchorPoint(pointData: Omit<AnchorPoint, 'id' | 'dataHo
 // Atualizar ponto de ancoragem
 export async function updateAnchorPoint(pointId: string, updates: Partial<AnchorPoint>, userId?: string) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Buscar ponto para verificar projectId
+    const existingPoint = await prisma.anchorPoint.findUnique({
+      where: { id: pointId },
+      select: { projectId: true }
+    });
+
+    if (!existingPoint) {
+      throw new Error('Anchor point not found');
+    }
+
+    // 3. Validar acesso ao projeto
+    await requireProjectAccess(user.id, existingPoint.projectId);
+
+    // 4. Verificar permissão para editar
+    if (!canEditMap({ user, projectId: existingPoint.projectId }) && !canCreatePoints({ user, projectId: existingPoint.projectId })) {
+      throw new Error('Permission denied: Cannot edit anchor points');
+    }
+
+    // 5. Log de auditoria
+    logAction('UPDATE_ANCHOR_POINT', user.id, {
+      pointId,
+      projectId: existingPoint.projectId
+    });
+
     const updatedPoint = await prisma.anchorPoint.update({
       where: { id: pointId },
       data: {
         ...updates,
         posicaoX: updates.posicaoX ? Number(updates.posicaoX) : undefined,
         posicaoY: updates.posicaoY ? Number(updates.posicaoY) : undefined,
-        lastModifiedByUserId: userId,
+        lastModifiedByUserId: user.id,  // Usar user autenticado
         frequenciaInspecaoMeses: updates.frequenciaInspecaoMeses || null
       }
     });
@@ -134,12 +165,40 @@ export async function updateAnchorPoint(pointId: string, updates: Partial<Anchor
 // Arquivar ponto de ancoragem (soft delete)
 export async function archiveAnchorPoint(pointId: string, userId?: string) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Buscar ponto para verificar projectId
+    const existingPoint = await prisma.anchorPoint.findUnique({
+      where: { id: pointId },
+      select: { projectId: true }
+    });
+
+    if (!existingPoint) {
+      throw new Error('Anchor point not found');
+    }
+
+    // 3. Validar acesso ao projeto
+    await requireProjectAccess(user.id, existingPoint.projectId);
+
+    // 4. Verificar permissão para deletar
+    if (!canDeletePoints({ user, projectId: existingPoint.projectId })) {
+      throw new Error('Permission denied: Cannot archive anchor points');
+    }
+
+    // 5. Log de auditoria
+    logAction('ARCHIVE_ANCHOR_POINT', user.id, {
+      pointId,
+      projectId: existingPoint.projectId
+    });
+
     const archivedPoint = await prisma.anchorPoint.update({
       where: { id: pointId },
       data: {
         archived: true,
         archivedAt: new Date(),
-        lastModifiedByUserId: userId
+        archivedById: user.id,  // Novo campo Prisma
+        lastModifiedByUserId: user.id  // Usar user autenticado
       }
     });
 
@@ -153,12 +212,40 @@ export async function archiveAnchorPoint(pointId: string, userId?: string) {
 // Restaurar ponto arquivado
 export async function restoreAnchorPoint(pointId: string, userId?: string) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Buscar ponto para verificar projectId
+    const existingPoint = await prisma.anchorPoint.findUnique({
+      where: { id: pointId },
+      select: { projectId: true }
+    });
+
+    if (!existingPoint) {
+      throw new Error('Anchor point not found');
+    }
+
+    // 3. Validar acesso ao projeto
+    await requireProjectAccess(user.id, existingPoint.projectId);
+
+    // 4. Verificar permissão (precisa poder criar pontos para restaurar)
+    if (!canCreatePoints({ user, projectId: existingPoint.projectId })) {
+      throw new Error('Permission denied: Cannot restore anchor points');
+    }
+
+    // 5. Log de auditoria
+    logAction('RESTORE_ANCHOR_POINT', user.id, {
+      pointId,
+      projectId: existingPoint.projectId
+    });
+
     const restoredPoint = await prisma.anchorPoint.update({
       where: { id: pointId },
       data: {
         archived: false,
         archivedAt: null,
-        lastModifiedByUserId: userId
+        archivedById: null,  // Limpar archivedById
+        lastModifiedByUserId: user.id  // Usar user autenticado
       }
     });
 
@@ -176,6 +263,22 @@ export async function restoreAnchorPoint(pointId: string, userId?: string) {
 // Buscar testes de um ponto específico
 export async function getAnchorTestsForPoint(pointId: string) {
   try {
+    // Verificar autenticação
+    const user = await requireAuthentication();
+
+    // Buscar ponto para verificar projectId
+    const point = await prisma.anchorPoint.findUnique({
+      where: { id: pointId },
+      select: { projectId: true }
+    });
+
+    if (!point) {
+      throw new Error('Anchor point not found');
+    }
+
+    // Validar acesso ao projeto
+    await requireProjectAccess(user.id, point.projectId);
+
     const tests = await prisma.anchorTest.findMany({
       where: { pontoId: pointId },
       orderBy: { dataHora: 'desc' }
@@ -191,6 +294,10 @@ export async function getAnchorTestsForPoint(pointId: string) {
 // Buscar todos os testes de um projeto
 export async function getAnchorTestsForProject(projectId: string) {
   try {
+    // Verificar autenticação e acesso ao projeto
+    const user = await requireAuthentication();
+    await requireProjectAccess(user.id, projectId);
+
     const tests = await prisma.anchorTest.findMany({
       where: {
         anchorPoint: {
@@ -218,19 +325,49 @@ export async function getAnchorTestsForProject(projectId: string) {
 // Adicionar novo teste
 export async function addAnchorTest(testData: Omit<AnchorTest, 'id' | 'dataHora'>) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Buscar ponto para verificar projectId
+    const point = await prisma.anchorPoint.findUnique({
+      where: { id: testData.pontoId },
+      select: { projectId: true }
+    });
+
+    if (!point) {
+      throw new Error('Anchor point not found');
+    }
+
+    // 3. Validar acesso ao projeto
+    await requireProjectAccess(user.id, point.projectId);
+
+    // 4. Verificar permissão (todos podem realizar testes)
+    if (!canPerformTests({ user })) {
+      throw new Error('Permission denied: Cannot perform tests');
+    }
+
+    // 5. Log de auditoria
+    logAction('CREATE_ANCHOR_TEST', user.id, {
+      pontoId: testData.pontoId,
+      projectId: point.projectId,
+      resultado: testData.resultado
+    });
+
     const newTest = await prisma.anchorTest.create({
       data: {
         ...testData,
-        dataHora: new Date()
+        dataHora: new Date(),
+        createdByUserId: user.id  // Usar user autenticado
       }
     });
 
     // Atualizar status do ponto automaticamente
     await prisma.anchorPoint.update({
       where: { id: testData.pontoId },
-      data: { 
+      data: {
         status: testData.resultado,
-        lastModifiedByUserId: testData.pontoId // Assume que o técnico que testou é quem modificou
+        lastModifiedByUserId: user.id,  // Usar user autenticado
+        lastInspectionDate: new Date()  // Novo campo Prisma
       }
     });
 
@@ -244,6 +381,33 @@ export async function addAnchorTest(testData: Omit<AnchorTest, 'id' | 'dataHora'
 // Atualizar teste existente
 export async function updateAnchorTest(testId: string, updates: Partial<AnchorTest>) {
   try {
+    // 1. Autenticação
+    const user = await requireAuthentication();
+
+    // 2. Buscar teste para verificar projectId
+    const existingTest = await prisma.anchorTest.findUnique({
+      where: { id: testId },
+      include: { anchorPoint: { select: { projectId: true } } }
+    });
+
+    if (!existingTest) {
+      throw new Error('Test not found');
+    }
+
+    // 3. Validar acesso ao projeto
+    await requireProjectAccess(user.id, existingTest.anchorPoint.projectId);
+
+    // 4. Verificar permissão (precisa poder realizar testes ou editar)
+    if (!canPerformTests({ user }) && !canEditMap({ user, projectId: existingTest.anchorPoint.projectId })) {
+      throw new Error('Permission denied: Cannot update tests');
+    }
+
+    // 5. Log de auditoria
+    logAction('UPDATE_ANCHOR_TEST', user.id, {
+      testId,
+      pontoId: existingTest.pontoId
+    });
+
     const updatedTest = await prisma.anchorTest.update({
       where: { id: testId },
       data: updates
@@ -253,7 +417,11 @@ export async function updateAnchorTest(testId: string, updates: Partial<AnchorTe
     if (updates.resultado) {
       await prisma.anchorPoint.update({
         where: { id: updatedTest.pontoId },
-        data: { status: updates.resultado }
+        data: {
+          status: updates.resultado,
+          lastInspectionDate: new Date(),  // Atualizar data de inspeção
+          lastModifiedByUserId: user.id
+        }
       });
     }
 
@@ -270,6 +438,9 @@ export async function updateAnchorTest(testId: string, updates: Partial<AnchorTe
 
 // Sincronizar pontos do localStorage para o banco
 export async function syncPointsFromLocalStorage(localPoints: AnchorPoint[], userId?: string) {
+  // Autenticação
+  const user = await requireAuthentication();
+
   const results = {
     synced: 0,
     failed: 0,
@@ -277,6 +448,14 @@ export async function syncPointsFromLocalStorage(localPoints: AnchorPoint[], use
   };
 
   for (const point of localPoints) {
+    // Validar acesso ao projeto para cada ponto
+    try {
+      await requireProjectAccess(user.id, point.projectId);
+    } catch (error) {
+      results.failed++;
+      results.errors.push(`Ponto ${point.numeroPonto}: No access to project`);
+      continue;
+    }
     try {
       // Verifica se o ponto já existe
       const existing = await prisma.anchorPoint.findFirst({
@@ -308,7 +487,7 @@ export async function syncPointsFromLocalStorage(localPoints: AnchorPoint[], use
             status: point.status,
             archived: point.archived || false,
             archivedAt: point.archivedAt ? new Date(point.archivedAt) : null,
-            lastModifiedByUserId: userId
+            lastModifiedByUserId: user.id  // Usar user autenticado
           }
         });
       } else {
@@ -329,8 +508,8 @@ export async function syncPointsFromLocalStorage(localPoints: AnchorPoint[], use
             posicaoY: Number(point.posicaoY),
             dataHora: point.dataHora ? new Date(point.dataHora) : new Date(),
             status: point.status || 'Não Testado',
-            createdByUserId: userId,
-            lastModifiedByUserId: userId,
+            createdByUserId: user.id,  // Usar user autenticado
+            lastModifiedByUserId: user.id,  // Usar user autenticado
             archived: point.archived || false,
             archivedAt: point.archivedAt ? new Date(point.archivedAt) : null
           }
@@ -350,6 +529,9 @@ export async function syncPointsFromLocalStorage(localPoints: AnchorPoint[], use
 
 // Sincronizar testes do localStorage para o banco
 export async function syncTestsFromLocalStorage(localTests: AnchorTest[]) {
+  // Autenticação
+  const user = await requireAuthentication();
+
   const results = {
     synced: 0,
     failed: 0,
@@ -357,6 +539,23 @@ export async function syncTestsFromLocalStorage(localTests: AnchorTest[]) {
   };
 
   for (const test of localTests) {
+    // Validar acesso ao projeto através do ponto
+    try {
+      const point = await prisma.anchorPoint.findUnique({
+        where: { id: test.pontoId },
+        select: { projectId: true }
+      });
+
+      if (!point) {
+        throw new Error('Point not found');
+      }
+
+      await requireProjectAccess(user.id, point.projectId);
+    } catch (error) {
+      results.failed++;
+      results.errors.push(`Teste ${test.id}: No access to project`);
+      continue;
+    }
     try {
       // Verifica se o teste já existe
       const existing = await prisma.anchorTest.findFirst({
@@ -411,6 +610,19 @@ export async function syncTestsFromLocalStorage(localTests: AnchorTest[]) {
 // Buscar dados completos para cache offline
 export async function fetchDataForOfflineCache(companyId: string, projectId?: string) {
   try {
+    // Autenticação
+    const user = await requireAuthentication();
+
+    // Validar que o user pertence à company
+    if (user.companyId !== companyId) {
+      throw new Error('Permission denied: Cannot access this company data');
+    }
+
+    // Se projectId fornecido, validar acesso
+    if (projectId) {
+      await requireProjectAccess(user.id, projectId);
+    }
+
     const baseData = {
       users: await prisma.user.findMany({
         where: { companyId }
