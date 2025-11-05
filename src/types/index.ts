@@ -9,7 +9,7 @@ export interface Company {
   
   // Subscription fields
   subscriptionPlan?: 'trial' | 'basic' | 'pro' | 'enterprise';
-  subscriptionStatus?: 'active' | 'expired' | 'cancelled' | 'suspended';
+  subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'paused';
   trialStartDate?: string;
   trialEndDate?: string;
   subscriptionExpiryDate?: string;
@@ -374,11 +374,12 @@ export interface AnchorPoint {
   // Soft-delete
   archived?: boolean;
   archivedAt?: string;
+  archivedById?: string;
 
   // CAMPOS PWA AVANÇADOS
   deviceId?: string;              // ID do dispositivo que criou/editou
   syncStatus?: 'pending' | 'synced' | 'conflict' | 'error'; // Status de sincronização
-  lastSyncAt?: string;            // Última sincronização
+  lastSyncedAt?: string;          // Última sincronização
   offlineCreated?: boolean;       // Se foi criado offline
   photoUploadPending?: boolean;   // Se foto está pendente de upload
   photoCompressed?: boolean;      // Se foto foi comprimida
@@ -403,6 +404,7 @@ export interface AnchorPoint {
   // INSPEÇÕES REGULAMENTARES
   lastInspectionDate?: string;    // Última inspeção oficial
   nextInspectionDate?: string;    // Próxima inspeção obrigatória
+  inspectionInterval?: number;    // Intervalo de inspeção em dias (padrão 180)
   inspectionCertificate?: string; // Certificado de inspeção
   inspectionStatus?: 'em-dia' | 'vencendo' | 'vencido'; // Status da inspeção
   
@@ -438,14 +440,29 @@ export interface AnchorTest extends AnchorTestResult {
   lastSyncAt?: string;            // Última sincronização
   offlineCreated?: boolean;       // Se foi criado offline
   photosUploadPending?: boolean;  // Se fotos estão pendentes de upload
+
+  // CONFORMIDADE E CERTIFICAÇÃO (Novos campos Prisma)
+  regulatoryStandard?: string;    // Norma regulamentar aplicada
+  complianceStatus?: string;      // Status de conformidade
+  certificationNumber?: string;   // Número de certificação
   
   // CAMPOS DE AUDITORIA DO TESTE
   testTemperature?: number;       // Temperatura durante o teste (°C)
   testHumidity?: number;          // Umidade durante o teste (%)
   testWindSpeed?: number;         // Velocidade do vento (km/h)
   testWeatherConditions?: string; // Condições climáticas
+
+  // CAMPOS AMBIENTAIS PADRONIZADOS (Novos campos Prisma)
+  weatherConditions?: string;     // Condições climáticas padronizadas
+  temperature?: number;           // Temperatura (°C)
+  humidity?: number;              // Umidade (%)
   
-  // EQUIPAMENTOS UTILIZADOS NO TESTE
+  // EQUIPAMENTOS UTILIZADOS NO TESTE (Novos campos Prisma)
+  equipmentUsed?: string;         // Equipamento utilizado
+  equipmentSerialNumber?: string; // Número de série do equipamento
+  equipmentCalibration?: string;  // Data de calibração do equipamento
+
+  // EQUIPAMENTOS LEGADOS (manter compatibilidade)
   dynamometerModel?: string;      // Modelo do dinamômetro
   dynamometerSerial?: string;     // Série do dinamômetro
   dynamometerCalibration?: string; // Data da calibração
@@ -456,6 +473,11 @@ export interface AnchorTest extends AnchorTestResult {
   technicianCertificates?: string[]; // Certificações do técnico
   witnessName?: string;           // Nome da testemunha
   witnessDocument?: string;       // Documento da testemunha
+
+  // CREDENCIAIS DO TÉCNICO PADRONIZADAS (Novos campos Prisma)
+  technicianLicense?: string;     // Licença/registro profissional do técnico
+  technicianCertification?: string; // Certificação profissional
+  supervisorId?: string;          // ID do supervisor responsável
   
   // CONFORMIDADE E NORMAS
   appliedStandards?: string[];    // Normas aplicadas (NR-35, NBR 16325, etc)

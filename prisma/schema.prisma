@@ -68,6 +68,8 @@ model User {
   company                  Company               @relation(fields: [companyId], references: [id])
   createdAnchorPoints      AnchorPoint[]         @relation("CreatedByUser")
   lastModifiedAnchorPoints AnchorPoint[]         @relation("LastModifiedByUser")
+  archivedAnchorPoints     AnchorPoint[]         @relation("ArchivedByUser")
+  supervisedTests          AnchorTest[]          @relation("SupervisedTests")
   auditLogs                AuditLog[]
   files                    File[]
   notifications            Notification[]
@@ -220,9 +222,29 @@ model AnchorPoint {
   lastModifiedByUserId    String?      @map("last_modified_by_user_id")
   archived                Boolean      @default(false)
   archivedAt              DateTime?    @map("archived_at")
+  archivedById            String?      @map("archived_by_id")
   floorPlanId             String?      @map("floor_plan_id")
+
+  // PWA Sync fields
+  photoUploadPending      Boolean      @default(false) @map("photo_upload_pending")
+  lastSyncedAt            DateTime?    @map("last_synced_at")
+  syncStatus              String?      @default("synced") @map("sync_status")
+
+  // GPS fields
+  gpsLatitude             Float?       @map("gps_latitude")
+  gpsLongitude            Float?       @map("gps_longitude")
+  gpsAccuracy             Float?       @map("gps_accuracy")
+  gpsTimestamp            DateTime?    @map("gps_timestamp")
+
+  // Inspection tracking fields
+  nextInspectionDate      DateTime?    @map("next_inspection_date")
+  inspectionInterval      Int?         @default(180) @map("inspection_interval") // dias
+  lastInspectionDate      DateTime?    @map("last_inspection_date")
+
+  // Relations
   createdBy               User?        @relation("CreatedByUser", fields: [createdByUserId], references: [id])
   lastModifiedBy          User?        @relation("LastModifiedByUser", fields: [lastModifiedByUserId], references: [id])
+  archivedBy              User?        @relation("ArchivedByUser", fields: [archivedById], references: [id])
   project                 Project      @relation(fields: [projectId], references: [id])
   floorPlan               FloorPlan?   @relation(fields: [floorPlanId], references: [id], onDelete: SetNull)
   anchorTests             AnchorTest[]
@@ -232,18 +254,41 @@ model AnchorPoint {
 }
 
 model AnchorTest {
-  id             String      @id @default(cuid())
-  pontoId        String      @map("ponto_id")
-  dataHora       DateTime    @default(now()) @map("data_hora")
-  resultado      String
-  carga          String
-  tempo          String
-  tecnico        String
-  observacoes    String?
-  fotoTeste      String?     @map("foto_teste")
-  fotoPronto     String?     @map("foto_pronto")
-  dataFotoPronto String?     @map("data_foto_pronto")
-  anchorPoint    AnchorPoint @relation(fields: [pontoId], references: [id])
+  id                      String      @id @default(cuid())
+  pontoId                 String      @map("ponto_id")
+  dataHora                DateTime    @default(now()) @map("data_hora")
+  resultado               String
+  carga                   String
+  tempo                   String
+  tecnico                 String
+  observacoes             String?
+  fotoTeste               String?     @map("foto_teste")
+  fotoPronto              String?     @map("foto_pronto")
+  dataFotoPronto          String?     @map("data_foto_pronto")
+
+  // Compliance fields
+  regulatoryStandard      String?     @map("regulatory_standard") // ex: "ABNT NBR 15475"
+  complianceStatus        String?     @default("compliant") @map("compliance_status")
+  certificationNumber     String?     @map("certification_number")
+
+  // Equipment fields
+  equipmentUsed           String?     @map("equipment_used")
+  equipmentSerialNumber   String?     @map("equipment_serial_number")
+  equipmentCalibration    DateTime?   @map("equipment_calibration")
+
+  // Environmental fields
+  weatherConditions       String?     @map("weather_conditions")
+  temperature             Float?      @map("temperature")
+  humidity                Float?      @map("humidity")
+
+  // Technician credentials fields
+  technicianLicense       String?     @map("technician_license")
+  technicianCertification String?     @map("technician_certification")
+  supervisorId            String?     @map("supervisor_id")
+
+  // Relations
+  anchorPoint             AnchorPoint @relation(fields: [pontoId], references: [id])
+  supervisor              User?       @relation("SupervisedTests", fields: [supervisorId], references: [id])
 
   @@map("anchor_tests")
 }
@@ -613,14 +658,14 @@ model Team {
 }
 
 model TeamMember {
-  id       String   @id @default(cuid())
-  teamId   String   @map("team_id")
-  userId   String   @map("user_id")
-  role     String   @default("technician")
-  active   Boolean  @default(true)
-  joinedAt DateTime @default(now()) @map("joined_at")
-  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String         @id @default(cuid())
+  teamId   String         @map("team_id")
+  userId   String         @map("user_id")
+  role     TeamMemberRole @default(member)
+  active   Boolean        @default(true)
+  joinedAt DateTime       @default(now()) @map("joined_at")
+  team     Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@map("team_members")
@@ -795,25 +840,25 @@ model FloorPlan {
 
 // Facade Inspection System
 model FacadeInspection {
-  id             String                @id @default(cuid())
-  projectId      String                @map("project_id")
-  name           String
-  description    String?
-  status         InspectionStatus      @default(in_progress)
-  scheduledDate  DateTime?             @map("scheduled_date")
-  startedAt      DateTime?             @map("started_at")
-  completedAt    DateTime?             @map("completed_at")
-  inspectorId    String?               @map("inspector_id")
-  inspectorName  String?               @map("inspector_name")
-  engineerId     String?               @map("engineer_id")
-  createdById    String                @map("created_by_id")
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
-  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engineer       User?                 @relation("InspectionEngineer", fields: [engineerId], references: [id])
-  createdBy      User                  @relation("InspectionCreator", fields: [createdById], references: [id])
-  facadeSides    FacadeSide[]
-  reports        InspectionReport[]
+  id               String                @id @default(cuid())
+  projectId        String                @map("project_id")
+  name             String
+  description      String?
+  status           InspectionStatus      @default(in_progress)
+  scheduledDate    DateTime?             @map("scheduled_date")
+  startedAt        DateTime?             @map("started_at")
+  completedAt      DateTime?             @map("completed_at")
+  inspectorId      String?               @map("inspector_id")
+  inspectorName    String?               @map("inspector_name")
+  engineerId       String?               @map("engineer_id")
+  createdByUserId  String                @map("created_by_user_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  project          Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineer         User?                 @relation("InspectionEngineer", fields: [engineerId], references: [id])
+  createdBy        User                  @relation("InspectionCreator", fields: [createdByUserId], references: [id])
+  facadeSides      FacadeSide[]
+  reports          InspectionReport[]
 
   @@index([projectId])
   @@index([status])
@@ -822,7 +867,7 @@ model FacadeInspection {
 
 model FacadeSide {
   id                   String             @id @default(cuid())
-  facadeInspectionId   String             @map("facade_inspection_id")
+  inspectionId         String             @map("inspection_id")
   name                 String
   sideType             FacadeSideType     @map("side_type")
   image                String             @db.Text // Base64 floor plan image
@@ -837,10 +882,10 @@ model FacadeSide {
   order                Int                @default(0)
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
-  facadeInspection     FacadeInspection   @relation(fields: [facadeInspectionId], references: [id], onDelete: Cascade)
+  inspection           FacadeInspection   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   pathologyMarkers     PathologyMarker[]
 
-  @@index([facadeInspectionId])
+  @@index([inspectionId])
   @@map("facade_sides")
 }
 
@@ -922,11 +967,18 @@ enum UserRole {
   technician
 }
 
+enum TeamMemberRole {
+  leader
+  member
+  observer
+}
+
 enum SubscriptionStatus {
   active
   past_due
   canceled
   trialing
+  paused
 }
 
 enum PaymentStatus {
