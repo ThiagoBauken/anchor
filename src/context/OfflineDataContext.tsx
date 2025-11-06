@@ -99,7 +99,16 @@ const OfflineDataContext = createContext<OfflineDataContextType | null>(null)
 
 export function OfflineDataProvider({ children }: { children: ReactNode }) {
   const { user: currentUser, company: currentCompany, isAuthenticated } = useDatabaseAuthSafe()
-  
+
+  console.log('[OfflineDataContext] Auth state:', {
+    hasUser: !!currentUser,
+    userName: currentUser?.name,
+    userRole: currentUser?.role,
+    hasCompany: !!currentCompany,
+    companyName: currentCompany?.name,
+    isAuthenticated
+  })
+
   // Data state
   const [users, setUsers] = useState<User[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -200,19 +209,21 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
         console.log('✅ Floor plans loaded:', convertedFloorPlans.length)
 
         // Auto-select floor plan logic:
-        // 1. If current floor plan doesn't belong to this project, clear it
-        // 2. If no floor plan selected, auto-select first active one
-        if (currentFloorPlan && currentFloorPlan.projectId !== currentProject.id) {
-          setCurrentFloorPlan(null)
-        }
+        // 1. Check if current floor plan belongs to this project
+        // 2. If not, or if no floor plan selected, auto-select first active one
+        const needsNewSelection = !currentFloorPlan ||
+                                  currentFloorPlan.projectId !== currentProject.id
 
-        // Auto-select first floor plan if none is selected
-        if (!currentFloorPlan && convertedFloorPlans.length > 0) {
+        if (needsNewSelection && convertedFloorPlans.length > 0) {
           // Prefer first active floor plan
           const firstActive = convertedFloorPlans.find(fp => fp.active)
           const floorPlanToSelect = firstActive || convertedFloorPlans[0]
           setCurrentFloorPlan(floorPlanToSelect)
-          console.log('🎯 Auto-selected floor plan:', floorPlanToSelect.name)
+          console.log('🎯 Auto-selected floor plan:', floorPlanToSelect.name, '(reason:', !currentFloorPlan ? 'no selection' : 'wrong project', ')')
+        } else if (!needsNewSelection && currentFloorPlan) {
+          console.log('✅ Keeping current floor plan:', currentFloorPlan.name)
+        } else {
+          console.log('⚠️ No floor plans available for project')
         }
       } catch (error) {
         console.error('❌ Error loading floor plans:', error)

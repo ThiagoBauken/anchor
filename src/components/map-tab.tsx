@@ -75,7 +75,12 @@ export function MapTab({ onActiveFloorPlanChange }: { onActiveFloorPlanChange?: 
     hasCurrentProject: !!currentProject,
     projectName: currentProject?.name,
     floorPlansCount: floorPlans?.length || 0,
-    currentFloorPlanName: currentFloorPlan?.name
+    currentFloorPlanName: currentFloorPlan?.name,
+    currentFloorPlanId: currentFloorPlan?.id,
+    floorPlanImageLength: currentFloorPlan?.image?.length || 0,
+    hasCurrentUser: !!currentUser,
+    currentUserName: currentUser?.name,
+    currentUserRole: currentUser?.role
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,6 +188,24 @@ export function MapTab({ onActiveFloorPlanChange }: { onActiveFloorPlanChange?: 
       resetLineTool();
     }
   };
+
+  if (!currentUser) {
+    return (
+      <Card className="mt-4 bg-destructive/10 border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">⚠️ Usuário não autenticado</CardTitle>
+          <CardDescription>
+            Você precisa estar logado para visualizar o mapa. Faça login e tente novamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Verifique se você está logado corretamente. Se o problema persistir, limpe o cache do navegador e faça login novamente.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
