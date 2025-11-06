@@ -310,7 +310,8 @@ export interface PathologyMarker {
     width?: number;  // ← NOVO: Para retângulos
     height?: number;  // ← NOVO: Para retângulos
   };
-  zIndex: number;  // ← NOVO: Controle de camadas (qual fica na frente)
+  // zIndex: number;  // ← TEMPORARIAMENTE COMENTADO ATÉ MIGRAÇÃO - Controle de camadas (qual fica na frente)
+  zIndex?: number;  // ← OPCIONAL até migração aplicada
   area?: number; // Area in square meters
   floor?: string; // Floor identification (e.g., "7", "10", "Térreo")
   division?: string; // Division identification (e.g., "D1", "D2", "D3"... "D7")
