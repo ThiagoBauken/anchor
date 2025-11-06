@@ -4,13 +4,30 @@ declare global {
   var prisma: PrismaClient | undefined
 }
 
+// Check if we're in build phase (skip DB connection during build)
+// Next.js sets NEXT_PHASE during builds, and we also check for common CI/build indicators
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.NEXT_PHASE === 'phase-development-build' ||
+  process.env.CI === 'true' ||
+  process.env.VERCEL_ENV === 'preview'
+
 // Modo de fallback quando o banco não está disponível
 const createPrismaClient = () => {
   try {
+    // Skip Prisma Client creation during build phase
+    if (isBuildPhase) {
+      console.log('⏭️  Skipping Prisma Client initialization during build phase')
+      return null
+    }
+
     // Check if DATABASE_URL is set
     if (!process.env.DATABASE_URL) {
-      console.error('❌ DATABASE_URL is not set in environment variables')
-      console.error('Please configure DATABASE_URL in your .env file or deployment environment')
+      // Only log error in server runtime (not client-side, not build)
+      if (typeof window === 'undefined') {
+        console.error('❌ DATABASE_URL is not set in environment variables')
+        console.error('Please configure DATABASE_URL in your .env file or deployment environment')
+      }
       return null
     }
 

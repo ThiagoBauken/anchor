@@ -23,6 +23,8 @@ COPY . .
 
 # Build Next.js app with standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PHASE=phase-production-build
+ENV SKIP_ENV_VALIDATION=1
 RUN npm run build
 
 # Production image, copy all the files and run next
