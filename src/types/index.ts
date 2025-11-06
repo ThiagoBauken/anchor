@@ -303,8 +303,14 @@ export interface PathologyMarker {
   facadeSideId: string;
   categoryId: string;
   geometry: {
-    points: { x: number; y: number }[];
-  }; // Polygon points for drawing on the facade photo
+    type: 'rectangle' | 'polygon';  // ← NOVO: tipo de forma
+    points?: { x: number; y: number }[];  // Para polígonos (antigo)
+    x?: number;  // ← NOVO: Para retângulos
+    y?: number;  // ← NOVO: Para retângulos
+    width?: number;  // ← NOVO: Para retângulos
+    height?: number;  // ← NOVO: Para retângulos
+  };
+  zIndex: number;  // ← NOVO: Controle de camadas (qual fica na frente)
   area?: number; // Area in square meters
   floor?: string; // Floor identification (e.g., "7", "10", "Térreo")
   division?: string; // Division identification (e.g., "D1", "D2", "D3"... "D7")

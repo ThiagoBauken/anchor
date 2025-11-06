@@ -911,7 +911,8 @@ model PathologyMarker {
   id            String             @id @default(cuid())
   facadeSideId  String             @map("facade_side_id")
   categoryId    String             @map("category_id")
-  geometry      Json               // Polygon points: { points: [{ x, y }, ...] }
+  geometry      Json               // Can be rectangle: { type: 'rectangle', x, y, width, height } or polygon: { type: 'polygon', points: [{ x, y }, ...] }
+  zIndex        Int                @default(0) @map("z_index") // Layer control (higher = on top)
   area          Float?             // Area in square meters
   floor         String?            // Floor identification
   division      String?            // Division identification
@@ -930,6 +931,7 @@ model PathologyMarker {
 
   @@index([facadeSideId])
   @@index([categoryId])
+  @@index([zIndex])
   @@map("pathology_markers")
 }
 
