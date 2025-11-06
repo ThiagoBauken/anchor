@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useOfflineData } from '@/context/OfflineDataContext';
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,8 +41,7 @@ function LocationForm({ location, onSuccess, projectId }: LocationFormProps) {
   const [markerColor, setMarkerColor] = useState(location?.markerColor || '#6941DE');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { createLocation, updateLocation } = useOfflineData();
-  const { currentUser } = useOfflineAuthSafe();
+  const { createLocation, updateLocation, currentUser } = useOfflineData();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,8 +183,7 @@ function ProgressionGenerator({ onSuccess }: ProgressionGeneratorProps) {
   const [spacing, setSpacing] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { currentProject, createPoint, locations } = useOfflineData();
-  const { currentUser } = useOfflineAuthSafe();
+  const { currentProject, createPoint, locations, currentUser } = useOfflineData();
   const { toast } = useToast();
 
   const handleGenerate = async () => {
@@ -322,8 +319,7 @@ function ProgressionGenerator({ onSuccess }: ProgressionGeneratorProps) {
 }
 
 export function LocationsTab() {
-  const { locations, createLocation, deleteLocation, currentProject } = useOfflineData();
-  const { currentUser } = useOfflineAuthSafe();
+  const { locations, createLocation, deleteLocation, currentProject, currentUser } = useOfflineData();
   const [editLocation, setEditLocation] = useState<Location | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);

@@ -2,13 +2,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { useOfflineData } from '@/context/OfflineDataContext';
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext';
 import { FacadeInspectionManager } from './facade-inspection-manager';
 import { Building2 } from 'lucide-react';
 
 export function FacadesTab() {
-  const { currentProject } = useOfflineData();
-  const { currentUser } = useOfflineAuthSafe();
+  const { currentProject, currentUser } = useOfflineData();
 
   if (!currentProject) {
     return (
@@ -23,7 +21,21 @@ export function FacadesTab() {
   }
 
   if (!currentUser) {
-    return null;
+    return (
+      <Card className="mt-4 bg-destructive/10 border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">⚠️ Usuário não autenticado</CardTitle>
+          <CardDescription>
+            Você precisa estar logado para gerenciar inspeções de fachadas. Faça login e tente novamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Verifique se você está logado corretamente. Se o problema persistir, limpe o cache do navegador e faça login novamente.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   const canEdit = currentUser.role === 'superadmin' || currentUser.role === 'company_admin' || currentUser.role === 'team_admin';

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { InteractiveMap } from './interactive-map';
 import { Badge } from './ui/badge';
 import { useOfflineData } from '@/context/OfflineDataContext';
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -59,9 +58,9 @@ export function MapTab({ onActiveFloorPlanChange }: { onActiveFloorPlanChange?: 
     createFloorPlan,
     updateFloorPlan,
     deleteFloorPlan,
-    toggleFloorPlanActive
+    toggleFloorPlanActive,
+    currentUser
   } = useOfflineData();
-  const { currentUser } = useOfflineAuthSafe();
   
   // Local states for missing features
   const [showArchived, setShowArchived] = useState(false);
