@@ -443,7 +443,14 @@ export async function getPathologyMarkersForFacadeSide(facadeSideId: string) {
 export async function createPathologyMarker(
   facadeSideId: string,
   categoryId: string,
-  geometry: { points: { x: number; y: number }[] },
+  geometry: {
+    type?: 'rectangle' | 'polygon';
+    points?: { x: number; y: number }[];
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  },
   createdByUserId: string,
   metadata?: {
     area?: number;
@@ -455,6 +462,7 @@ export async function createPathologyMarker(
     status?: string;
     priority?: number;
     photos?: string[];
+    zIndex?: number;
   }
 ) {
   try {
@@ -463,6 +471,7 @@ export async function createPathologyMarker(
         facadeSideId,
         categoryId,
         geometry,
+        zIndex: metadata?.zIndex || 0,
         createdById: createdByUserId,
         area: metadata?.area,
         floor: metadata?.floor,
@@ -495,8 +504,16 @@ export async function createPathologyMarker(
 export async function updatePathologyMarker(
   markerId: string,
   data: {
-    geometry?: { points: { x: number; y: number }[] };
+    geometry?: {
+      type?: 'rectangle' | 'polygon';
+      points?: { x: number; y: number }[];
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+    };
     categoryId?: string;
+    zIndex?: number;
     area?: number;
     floor?: string;
     severity?: PathologySeverity;

@@ -251,6 +251,7 @@ export function FacadeInspectionManager({
       markerData.geometry,
       currentUserId,
       {
+        zIndex: markerData.zIndex,
         area: markerData.area,
         floor: markerData.floor,
         division: markerData.division,
