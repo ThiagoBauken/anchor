@@ -19,9 +19,9 @@ import {
 } from 'lucide-react';
 import {
   PhotoMetadata,
-  // getAllPhotoMetadata, // Not exported
+  getAllPhotoMetadata,
   syncAllPhotos,
-  // deletePhotoMetadata, // Not exported
+  deletePhotoMetadata,
   isCapacitorAvailable
 } from '@/lib/gallery-photo-service';
 import {
@@ -69,9 +69,9 @@ export default function PhotoSyncManager({
   const loadPhotos = async () => {
     setLoading(true);
     try {
-      // const allPhotos = await getAllPhotoMetadata(); // Function not exported
-      const allPhotos: PhotoMetadata[] = []; // Temporary fallback
+      const allPhotos = await getAllPhotoMetadata();
       setPhotos(allPhotos);
+      console.log(`[PhotoSyncManager] Loaded ${allPhotos.length} photos from IndexedDB`);
     } catch (error) {
       console.error('Error loading photos:', error);
       toast({
@@ -146,14 +146,20 @@ export default function PhotoSyncManager({
 
   const handleDeletePhoto = async (photoId: string) => {
     try {
-      // const success = await deletePhotoMetadata(photoId); // Function not exported
-      console.warn('Delete photo not implemented - function not exported');
-      toast({
-        title: 'Não disponível',
-        description: 'Remoção de fotos ainda não disponível.',
-        variant: 'destructive'
-      });
+      const success = await deletePhotoMetadata(photoId);
+
+      if (success) {
+        toast({
+          title: 'Foto removida',
+          description: 'Os metadados da foto foram removidos com sucesso.'
+        });
+        // Recarregar lista de fotos
+        await loadPhotos();
+      } else {
+        throw new Error('Failed to delete photo metadata');
+      }
     } catch (error) {
+      console.error('Error deleting photo:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível remover a foto.',

@@ -320,7 +320,8 @@ export function InteractiveMap({
     // This was a click
     setIsPanning(false);
 
-    const canAddPoint = (currentUser?.role === 'superadmin' || currentUser?.role === 'company_admin' || currentUser?.role === 'team_admin') && !lineToolMode;
+    // Only superadmin and team_admin can add points (company_admin is view-only)
+    const canAddPoint = (currentUser?.role === 'superadmin' || currentUser?.role === 'team_admin') && !lineToolMode;
 
     if (!canAddPoint || !svgRef.current) return;
 
@@ -398,7 +399,8 @@ export function InteractiveMap({
   }, [lineToolStartPointId, lineToolEndPointId, getPointById]);
 
 
-  const canAddPoints = (currentUser?.role === 'superadmin' || currentUser?.role === 'company_admin' || currentUser?.role === 'team_admin') && !lineToolMode;
+  // Only superadmin and team_admin can add points (company_admin is view-only)
+  const canAddPoints = (currentUser?.role === 'superadmin' || currentUser?.role === 'team_admin') && !lineToolMode;
   const cursorClass = isExport ? '' : (canAddPoints ? 'cursor-crosshair' : (isPanning ? 'cursor-grabbing' : 'cursor-grab'));
 
   return (

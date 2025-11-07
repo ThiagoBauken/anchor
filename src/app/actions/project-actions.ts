@@ -154,6 +154,73 @@ export async function addProject(projectData: Omit<Project, 'id' | 'deleted' | '
   }
 }
 
+export async function updateProject(
+  id: string,
+  updates: Partial<Omit<Project, 'id' | 'companyId' | 'createdByUserId' | 'deleted' | 'createdAt' | 'updatedAt'>>
+): Promise<Project | null> {
+  console.log('[DEBUG] updateProject server action called:', { id, updates });
+
+  // Autenticação
+  const user = await requireAuthentication();
+
+  // Buscar projeto para validar permissões
+  const project = await prisma?.project.findUnique({
+    where: { id },
+    select: { companyId: true, name: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  // Validar acesso à company
+  await requireCompanyMatch(user.id, project.companyId);
+
+  // Verificar permissão para editar projetos (mesmas permissões que criar)
+  if (!canCreateProjects({ user })) {
+    throw new Error('Permission denied: Cannot update projects');
+  }
+
+  // Log de auditoria
+  logAction('UPDATE_PROJECT', user.id, {
+    projectId: id,
+    projectName: project.name,
+    updates: Object.keys(updates)
+  });
+
+  try {
+    if (!prisma) {
+      console.warn('[WARN] Prisma client not initialized, using localStorage fallback');
+      return localStorageProjects.update(id, updates);
+    }
+
+    console.log('[DEBUG] Attempting to update project in database...');
+
+    // Ensure floorPlanImages is an array if provided
+    const updateData = {
+      ...updates,
+      ...(updates.floorPlanImages !== undefined && { floorPlanImages: updates.floorPlanImages || [] })
+    };
+
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: updateData
+    });
+
+    console.log('[DEBUG] ✅ Project updated successfully in database:', updatedProject.id);
+    return updatedProject;
+  } catch (e) {
+    console.error("[ERROR] Failed to update project in database:", e);
+    console.error("[ERROR] Error details:", {
+      name: (e as Error)?.name,
+      message: (e as Error)?.message,
+      code: (e as any)?.code
+    });
+    console.warn('[WARN] Falling back to localStorage');
+    return localStorageProjects.update(id, updates);
+  }
+}
+
 export async function deleteProject(id: string): Promise<boolean> {
   console.log('[DEBUG] deleteProject server action called:', { id });
 

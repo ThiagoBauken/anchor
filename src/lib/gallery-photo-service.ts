@@ -195,6 +195,10 @@ export async function capturePhotoToGallery(metadata: {
       fileSize: undefined // Será calculado no upload
     };
 
+    // Salva metadados no IndexedDB
+    await savePhotoMetadata(photoMetadata);
+    console.log(`[PhotoDB] Metadata saved for: ${fileName}`);
+
     return photoMetadata;
   } catch (error) {
     console.error('[Gallery] Error capturing photo:', error);
@@ -297,11 +301,171 @@ export async function syncAllPhotos(
     if (success) {
       synced++;
       // Atualizar metadados no IndexedDB (marcar como uploaded)
-      // Isso seria feito pela camada superior que gerencia o IndexedDB
+      await updatePhotoMetadata(photo.id, {
+        uploaded: true,
+        uploadedAt: new Date().toISOString()
+      });
+      console.log(`[PhotoDB] Photo marked as uploaded: ${photo.fileName}`);
     }
   }
 
   return synced;
+}
+
+/**
+ * ==================================
+ * INDEXEDDB MANAGEMENT FOR PHOTO METADATA
+ * ==================================
+ */
+
+const DB_NAME = 'AnchorViewPhotoDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'photoMetadata';
+
+/**
+ * Abre conexão com IndexedDB
+ */
+async function openPhotoDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+
+      // Criar object store se não existir
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        objectStore.createIndex('uploaded', 'uploaded', { unique: false });
+        objectStore.createIndex('projectId', 'projectId', { unique: false });
+        objectStore.createIndex('pontoId', 'pontoId', { unique: false });
+        objectStore.createIndex('capturedAt', 'capturedAt', { unique: false });
+      }
+    };
+  });
+}
+
+/**
+ * Busca todos os metadados de fotos
+ */
+export async function getAllPhotoMetadata(): Promise<PhotoMetadata[]> {
+  try {
+    const db = await openPhotoDB();
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[PhotoDB] Error getting all photo metadata:', error);
+    return [];
+  }
+}
+
+/**
+ * Salva metadados de foto no IndexedDB
+ */
+export async function savePhotoMetadata(metadata: PhotoMetadata): Promise<boolean> {
+  try {
+    const db = await openPhotoDB();
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(metadata);
+
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('[PhotoDB] Error saving photo metadata:', error);
+    return false;
+  }
+}
+
+/**
+ * Atualiza metadados de foto (ex: marcar como uploaded)
+ */
+export async function updatePhotoMetadata(
+  photoId: string,
+  updates: Partial<PhotoMetadata>
+): Promise<boolean> {
+  try {
+    const db = await openPhotoDB();
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+
+    // Busca o metadata atual
+    const getRequest = store.get(photoId);
+
+    return new Promise((resolve, reject) => {
+      getRequest.onsuccess = () => {
+        const existingMetadata = getRequest.result;
+
+        if (!existingMetadata) {
+          reject(new Error('Photo metadata not found'));
+          return;
+        }
+
+        // Merge updates
+        const updatedMetadata = { ...existingMetadata, ...updates };
+        const putRequest = store.put(updatedMetadata);
+
+        putRequest.onsuccess = () => resolve(true);
+        putRequest.onerror = () => reject(putRequest.error);
+      };
+
+      getRequest.onerror = () => reject(getRequest.error);
+    });
+  } catch (error) {
+    console.error('[PhotoDB] Error updating photo metadata:', error);
+    return false;
+  }
+}
+
+/**
+ * Deleta metadados de foto
+ */
+export async function deletePhotoMetadata(photoId: string): Promise<boolean> {
+  try {
+    const db = await openPhotoDB();
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(photoId);
+
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.error('[PhotoDB] Error deleting photo metadata:', error);
+    return false;
+  }
+}
+
+/**
+ * Busca fotos pendentes de upload
+ */
+export async function getPendingPhotoMetadata(): Promise<PhotoMetadata[]> {
+  try {
+    const db = await openPhotoDB();
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const index = store.index('uploaded');
+    const request = index.getAll(false); // uploaded === false
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[PhotoDB] Error getting pending photos:', error);
+    return [];
+  }
 }
 
 /**
