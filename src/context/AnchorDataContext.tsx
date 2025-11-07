@@ -102,22 +102,37 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
             // This is a placeholder for a real company ID system.
             const activeCompanyId = savedCurrentUser?.companyId || 'clx3i4a7x000008l4hy822g62'; // Default company
 
+            let dbUsers: any[] = [];
+            let dbProjects: any[] = [];
+            let dbLocations: any[] = [];
+
             if (activeCompanyId) {
-                // Import server actions dynamically
-                const { getUsersForCompany } = await import('@/app/actions/user-actions');
-                const { getProjectsForCompany, getLocationsForCompany } = await import('@/app/actions/project-actions');
+                try {
+                    // Import server actions dynamically
+                    const { getUsersForCompany } = await import('@/app/actions/user-actions');
+                    const { getProjectsForCompany, getLocationsForCompany } = await import('@/app/actions/project-actions');
 
-                const [dbUsers, dbProjects, dbLocations] = await Promise.all([
-                    getUsersForCompany(activeCompanyId),
-                    getProjectsForCompany(activeCompanyId),
-                    getLocationsForCompany(activeCompanyId)
-                ]);
+                    [dbUsers, dbProjects, dbLocations] = await Promise.all([
+                        getUsersForCompany(activeCompanyId),
+                        getProjectsForCompany(activeCompanyId),
+                        getLocationsForCompany(activeCompanyId)
+                    ]);
 
-            setUsers(dbUsers as any);
-            setProjects(dbProjects as any);
-            
-            // Locations are now project-specific, skip default creation
-            setLocations(dbLocations as any);
+                    setUsers(dbUsers as any);
+                    setProjects(dbProjects as any);
+
+                    // Locations are now project-specific, skip default creation
+                    setLocations(dbLocations as any);
+                } catch (error) {
+                    console.warn('Failed to load data from server, using localStorage fallback:', error);
+                    // Fallback to localStorage
+                    dbUsers = [];
+                    dbProjects = JSON.parse(localStorage.getItem('anchorViewProjects') || '[]');
+                    dbLocations = JSON.parse(localStorage.getItem('anchorViewLocations') || '[]');
+                    setProjects(dbProjects);
+                    setLocations(dbLocations);
+                }
+            }
 
             // Se não há usuários no banco, tentar carregar do localStorage
             if (dbUsers.length === 0) {
