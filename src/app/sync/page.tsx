@@ -89,7 +89,7 @@ export default function SyncPage() {
     const tests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
 
     const pendingPoints: PendingItem[] = points
-      .filter((p: any) => p.syncStatus === 'pending')
+      .filter((p: any) => !p.syncStatus || p.syncStatus === 'pending')
       .map((p: any) => ({
         id: p.id,
         type: 'point' as const,
@@ -100,7 +100,7 @@ export default function SyncPage() {
       }));
 
     const pendingTests: PendingItem[] = tests
-      .filter((t: any) => t.syncStatus === 'pending')
+      .filter((t: any) => !t.syncStatus || t.syncStatus === 'pending')
       .map((t: any) => ({
         id: t.id,
         type: 'test' as const,
@@ -158,8 +158,8 @@ export default function SyncPage() {
       const points = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
       const tests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
 
-      const cleanedPoints = points.filter((p: any) => p.syncStatus !== 'pending');
-      const cleanedTests = tests.filter((t: any) => t.syncStatus !== 'pending');
+      const cleanedPoints = points.filter((p: any) => p.syncStatus && p.syncStatus !== 'pending');
+      const cleanedTests = tests.filter((t: any) => t.syncStatus && t.syncStatus !== 'pending');
 
       localStorage.setItem('anchorViewPoints', JSON.stringify(cleanedPoints));
       localStorage.setItem('anchorViewTests', JSON.stringify(cleanedTests));

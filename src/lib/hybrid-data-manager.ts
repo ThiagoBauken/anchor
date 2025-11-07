@@ -285,8 +285,11 @@ export class HybridDataManager {
     const points = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
     const tests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
 
-    const pendingPoints = points.filter((p: any) => p.syncStatus === 'pending').length;
-    const pendingTests = tests.filter((t: any) => t.syncStatus === 'pending').length;
+    // Count items as pending if:
+    // - syncStatus === 'pending' OR
+    // - syncStatus is undefined/null (newly created items)
+    const pendingPoints = points.filter((p: any) => !p.syncStatus || p.syncStatus === 'pending').length;
+    const pendingTests = tests.filter((t: any) => !t.syncStatus || t.syncStatus === 'pending').length;
 
     return {
       points: pendingPoints,
