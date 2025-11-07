@@ -151,6 +151,19 @@ export function canDeletePoints(context: PermissionContext): boolean {
 }
 
 /**
+ * Verifica se o usuário pode deletar projetos
+ * - superadmin: pode deletar
+ * - company_admin: pode deletar
+ * - team_admin: não pode deletar
+ * - technician: não pode deletar
+ */
+export function canDeleteProjects(context: PermissionContext): boolean {
+  const { user } = context;
+
+  return user.role === 'superadmin' || user.role === 'company_admin';
+}
+
+/**
  * Verifica se o usuário pode editar configurações de visualização pública
  * - superadmin: pode editar
  * - company_admin: pode editar

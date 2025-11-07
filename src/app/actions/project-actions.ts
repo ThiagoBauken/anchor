@@ -6,7 +6,7 @@ import type { MarkerShape } from '@/types';
 import { prisma } from '@/lib/prisma';
 import { localStorageProjects, localStorageLocations } from '@/lib/localStorage-fallback';
 import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
-import { canCreateProjects, canDeletePoints } from '@/lib/permissions';
+import { canCreateProjects, canDeletePoints, canDeleteProjects } from '@/lib/permissions';
 
 // == PROJECTS ==
 export async function getProjectsForCompany(companyId: string): Promise<Project[]> {
@@ -241,7 +241,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   await requireCompanyMatch(user.id, project.companyId);
 
   // Verificar permissão para deletar projetos
-  if (!canDeletePoints({ user })) {
+  if (!canDeleteProjects({ user })) {
     throw new Error('Permission denied: Cannot delete projects');
   }
 
