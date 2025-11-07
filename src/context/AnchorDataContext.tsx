@@ -3,8 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { AnchorPoint, AnchorTest, User, Project, AnchorTestResult, Location, MarkerShape, Company, UserRole } from '@/types';
-import { getProjectsForCompany, addProject as addProjectAction, deleteProject as deleteProjectAction, getLocationsForCompany, addLocation as addLocationAction, deleteLocation as deleteLocationAction, updateLocationShape as updateLocationShapeAction } from '@/app/actions/project-actions';
-import { getUsersForCompany, addUser as addUserAction, deleteUser as deleteUserAction } from '@/app/actions/user-actions';
+// Server actions imported dynamically to avoid SSR issues
 
 
 type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -96,18 +95,23 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
   // Initial data loading from DB and localStorage
   useEffect(() => {
     async function loadInitialData() {
-        // Try to get current user from localStorage first
-        const savedCurrentUser = JSON.parse(localStorage.getItem('anchorViewCurrentUser') || 'null');
-        
-        // This is a placeholder for a real company ID system.
-        const activeCompanyId = savedCurrentUser?.companyId || 'clx3i4a7x000008l4hy822g62'; // Default company
+        try {
+            // Try to get current user from localStorage first
+            const savedCurrentUser = JSON.parse(localStorage.getItem('anchorViewCurrentUser') || 'null');
 
-        if (activeCompanyId) {
-            const [dbUsers, dbProjects, dbLocations] = await Promise.all([
-                getUsersForCompany(activeCompanyId),
-                getProjectsForCompany(activeCompanyId),
-                getLocationsForCompany(activeCompanyId)
-            ]);
+            // This is a placeholder for a real company ID system.
+            const activeCompanyId = savedCurrentUser?.companyId || 'clx3i4a7x000008l4hy822g62'; // Default company
+
+            if (activeCompanyId) {
+                // Import server actions dynamically
+                const { getUsersForCompany } = await import('@/app/actions/user-actions');
+                const { getProjectsForCompany, getLocationsForCompany } = await import('@/app/actions/project-actions');
+
+                const [dbUsers, dbProjects, dbLocations] = await Promise.all([
+                    getUsersForCompany(activeCompanyId),
+                    getProjectsForCompany(activeCompanyId),
+                    getLocationsForCompany(activeCompanyId)
+                ]);
 
             setUsers(dbUsers as any);
             setProjects(dbProjects as any);
@@ -153,20 +157,26 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
                 setCurrentProject(null);
             }
         }
-      
-      // Load points and tests from localStorage (for now)
-      const savedPoints = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
-      const savedTests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
-      setAllPoints(savedPoints);
-      setAllTests(savedTests);
-      
-      const savedShowArchived = JSON.parse(localStorage.getItem('anchorViewShowArchived') || 'false');
-      const savedLastLocation = JSON.parse(localStorage.getItem('anchorViewLastLocation') || 'null');
-      setShowArchived(savedShowArchived);
-      setLastUsedLocation(savedLastLocation || '');
-      
-      setIsLoaded(true);
-      setSyncStatus('saved');
+
+            // Load points and tests from localStorage (for now)
+            const savedPoints = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
+            const savedTests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
+            setAllPoints(savedPoints);
+            setAllTests(savedTests);
+
+            const savedShowArchived = JSON.parse(localStorage.getItem('anchorViewShowArchived') || 'false');
+            const savedLastLocation = JSON.parse(localStorage.getItem('anchorViewLastLocation') || 'null');
+            setShowArchived(savedShowArchived);
+            setLastUsedLocation(savedLastLocation || '');
+
+            setIsLoaded(true);
+            setSyncStatus('saved');
+        } catch (error) {
+            console.error("Error in loadInitialData:", error);
+            // Set defaults even if loading fails
+            setIsLoaded(true);
+            setSyncStatus('error');
+        }
     }
     
     loadInitialData().catch(e => {
@@ -218,8 +228,9 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
       console.error('[ERROR] addUser: Missing companyId');
       return;
     }
-    
+
     try {
+      const { addUser: addUserAction } = await import('@/app/actions/user-actions');
       const newUser = await addUserAction(name, role, companyId);
       if (newUser) {
         setUsers(prev => {
@@ -245,6 +256,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
   const deleteUser = useCallback(async (id: string) => {
       console.log('[DEBUG] deleteUser called:', { id });
       try {
+        const { deleteUser: deleteUserAction } = await import('@/app/actions/user-actions');
         const success = await deleteUserAction(id);
       if(success) {
           setUsers(prev => prev.filter(u => u.id !== id));
@@ -265,6 +277,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
+      const { addProject: addProjectAction } = await import('@/app/actions/project-actions');
       const newProject = await addProjectAction({
           ...projectData,
           companyId: companyId,
@@ -283,6 +296,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
   const deleteProject = useCallback(async (id: string) => {
     console.log('[DEBUG] deleteProject called:', { id });
     try {
+      const { deleteProject: deleteProjectAction } = await import('@/app/actions/project-actions');
       const success = await deleteProjectAction(id);
     if(success) {
         const remainingProjects = projects.filter(p => p.id !== id);
@@ -443,6 +457,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     try {
+      const { addLocation: addLocationAction } = await import('@/app/actions/project-actions');
       const newLocation = await addLocationAction(locationName, 'circle', companyId);
       if(newLocation) {
           setLocations(prev => [...prev, newLocation as any]);
@@ -456,6 +471,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
   const deleteLocation = useCallback(async (locationId: string) => {
     console.log('[DEBUG] deleteLocation called:', { locationId });
     try {
+      const { deleteLocation: deleteLocationAction } = await import('@/app/actions/project-actions');
       const success = await deleteLocationAction(locationId);
       if(success) {
           setLocations(prev => prev.filter(l => l.id !== locationId));
@@ -470,6 +486,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
     console.log('[DEBUG] updateLocationShape called:', { locationId, shape });
     console.log('[DEBUG] Current locations before update:', locations);
     try {
+      const { updateLocationShape: updateLocationShapeAction } = await import('@/app/actions/project-actions');
       const updatedLocation = await updateLocationShapeAction(locationId, shape);
       console.log('[DEBUG] Updated location from action:', updatedLocation);
       if(updatedLocation) {
