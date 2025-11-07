@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { offlineDB } from '@/lib/indexeddb'
 import { useDatabaseAuthSafe } from './DatabaseAuthContext'
 import type { User, Project, Location, AnchorPoint, AnchorTest, AnchorTestResult, MarkerShape, UserRole, FloorPlan } from '@/types'
@@ -151,10 +151,16 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
   }
 
   // Computed values - allPointsForProject includes archived points
-  const allPointsForProject = currentProject ? points.filter(p => p.projectId === currentProject.id) : []
+  const allPointsForProject = useMemo(
+    () => currentProject ? points.filter(p => p.projectId === currentProject.id) : [],
+    [currentProject, points]
+  )
   
   // Current active points for the project (excluding archived)
-  const currentProjectPoints = currentProject ? getPointsByProject(currentProject.id) : []
+  const currentProjectPoints = useMemo(
+    () => currentProject ? getPointsByProject(currentProject.id) : [],
+    [currentProject, getPointsByProject]
+  )
 
   // Load data when authentication changes
   useEffect(() => {
@@ -960,7 +966,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     setLineToolPreviewPoints([])
   }
 
-  const contextValue: OfflineDataContextType = {
+  const contextValue: OfflineDataContextType = useMemo(() => ({
     // Data state
     users: getUsersForCompany(),
     projects: getProjectsForCompany(),
@@ -1047,7 +1053,29 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     lastInstallationDate,
     setLastSelectedLocation,
     setLastInstallationDate
-  }
+  }), [
+    // State dependencies
+    users, projects, locations, floorPlans, points, tests,
+    currentProject, currentLocation, currentFloorPlan, testPointId, currentUser,
+    showArchived, lineToolMode, lineToolStartPointId, lineToolEndPointId, lineToolPreviewPoints,
+    inspectionFlags, allPointsForProject, activeTab, isLoading,
+    lastSelectedLocation, lastInstallationDate,
+    // Getter functions (memoized by reference)
+    getUsersForCompany, getProjectsForCompany, getLocationsForCompany,
+    getPointsByProject, getTestsByPoint, getPointById, getProjectById,
+    // Action functions (stable references from useState)
+    setCurrentProject, setCurrentLocation, setCurrentFloorPlan, setTestPointId,
+    setLineToolStartPointId, setLineToolEndPointId, setLineToolMode, setLineToolPreviewPoints,
+    setShowArchived, setActiveTab, setLastSelectedLocation, setLastInstallationDate,
+    // Methods
+    createProject, updateProject, deleteProject,
+    createUser, updateUser, addUser, deleteUser,
+    createLocation, updateLocation, updateLocationShape, deleteLocation,
+    createFloorPlan, updateFloorPlan, deleteFloorPlan, toggleFloorPlanActive,
+    createPoint, updatePoint, deletePoint, unarchivePoint, addMultiplePoints,
+    createTest, updatePointsAndAddTest,
+    resetLineTool, refreshData
+  ])
 
   return (
     <OfflineDataContext.Provider value={contextValue}>
