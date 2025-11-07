@@ -2,6 +2,7 @@
 
 import { Team, TeamMember, ProjectTeamPermission } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
 
 // ===== TEAM MANAGEMENT =====
 
@@ -10,10 +11,16 @@ import { prisma } from '@/lib/prisma';
  */
 export async function getTeamsForCompany(companyId: string): Promise<Team[]> {
   console.log('[DEBUG] getTeamsForCompany called:', { companyId });
+
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   if (!companyId) {
     console.warn('[WARN] getTeamsForCompany: No companyId provided');
     return [];
   }
+
+  await requireCompanyMatch(user.id, companyId);
 
   try {
     if (!prisma) {
@@ -53,6 +60,9 @@ export async function getTeamsForCompany(companyId: string): Promise<Team[]> {
  * Get a specific team by ID with all details
  */
 export async function getTeamById(teamId: string): Promise<Team | null> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
 
@@ -72,6 +82,10 @@ export async function getTeamById(teamId: string): Promise<Team | null> {
         }
       }
     });
+
+    if (team) {
+      await requireCompanyMatch(user.id, team.companyId);
+    }
 
     return team;
   } catch (error) {
@@ -95,6 +109,10 @@ export async function createTeam(data: {
   insuranceExpiry?: Date;
 }): Promise<Team | null> {
   console.log('[DEBUG] createTeam called:', { name: data.name, companyId: data.companyId });
+
+  // Authentication and authorization
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, data.companyId);
 
   try {
     if (!prisma) {
@@ -125,6 +143,8 @@ export async function createTeam(data: {
       }
     });
 
+    logAction('CREATE_TEAM', user.id, { teamId: newTeam.id, teamName: data.name });
+
     console.log('[DEBUG] Team created successfully:', newTeam.id);
     return newTeam;
   } catch (error) {
@@ -152,8 +172,16 @@ export async function updateTeam(
 ): Promise<Team | null> {
   console.log('[DEBUG] updateTeam called:', { teamId });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
+
+    // Fetch team to verify company access
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return null;
+    await requireCompanyMatch(user.id, team.companyId);
 
     const updatedTeam = await prisma.team.update({
       where: { id: teamId },
@@ -182,6 +210,8 @@ export async function updateTeam(
       }
     });
 
+    logAction('UPDATE_TEAM', user.id, { teamId, updates: Object.keys(data) });
+
     console.log('[DEBUG] Team updated successfully');
     return updatedTeam;
   } catch (error) {
@@ -196,13 +226,23 @@ export async function updateTeam(
 export async function deleteTeam(teamId: string): Promise<boolean> {
   console.log('[DEBUG] deleteTeam called:', { teamId });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return false;
+
+    // Fetch team to verify company access
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return false;
+    await requireCompanyMatch(user.id, team.companyId);
 
     await prisma.team.update({
       where: { id: teamId },
       data: { active: false }
     });
+
+    logAction('DELETE_TEAM', user.id, { teamId, teamName: team.name });
 
     console.log('[DEBUG] Team deactivated successfully');
     return true;
@@ -218,8 +258,16 @@ export async function deleteTeam(teamId: string): Promise<boolean> {
  * Get all members of a team
  */
 export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return [];
+
+    // Fetch team to verify company access
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return [];
+    await requireCompanyMatch(user.id, team.companyId);
 
     const members = await prisma.teamMember.findMany({
       where: { teamId },
@@ -241,6 +289,18 @@ export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
  * Get all teams a user belongs to
  */
 export async function getUserTeams(userId: string): Promise<TeamMember[]> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Users can only view their own teams (unless they're accessing someone in their company)
+  if (user.id !== userId) {
+    // Verify that the target user belongs to the same company
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.companyId !== user.companyId) {
+      throw new Error('Unauthorized: Cannot access teams of users outside your company');
+    }
+  }
+
   try {
     if (!prisma) return [];
 
@@ -277,8 +337,22 @@ export async function addTeamMember(
 ): Promise<TeamMember | null> {
   console.log('[DEBUG] addTeamMember called:', { teamId, userId, role });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
+
+    // Fetch team to verify company access
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return null;
+    await requireCompanyMatch(user.id, team.companyId);
+
+    // Verify the user being added belongs to the same company
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.companyId !== team.companyId) {
+      throw new Error('Cannot add user from different company to team');
+    }
 
     // Check if membership already exists
     const existing = await prisma.teamMember.findUnique({
@@ -307,6 +381,8 @@ export async function addTeamMember(
       }
     });
 
+    logAction('ADD_TEAM_MEMBER', user.id, { teamId, userId, role });
+
     console.log('[DEBUG] Team member added successfully');
     return newMember;
   } catch (error) {
@@ -322,8 +398,19 @@ export async function updateTeamMemberRole(
   memberId: string,
   role: 'leader' | 'member' | 'observer'
 ): Promise<TeamMember | null> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
+
+    // Fetch member with team to verify company access
+    const member = await prisma.teamMember.findUnique({
+      where: { id: memberId },
+      include: { team: true }
+    });
+    if (!member) return null;
+    await requireCompanyMatch(user.id, member.team.companyId);
 
     const updated = await prisma.teamMember.update({
       where: { id: memberId },
@@ -333,6 +420,8 @@ export async function updateTeamMemberRole(
         team: true
       }
     });
+
+    logAction('UPDATE_TEAM_MEMBER_ROLE', user.id, { memberId, userId: member.userId, newRole: role });
 
     return updated;
   } catch (error) {
@@ -347,12 +436,25 @@ export async function updateTeamMemberRole(
 export async function removeTeamMember(memberId: string): Promise<boolean> {
   console.log('[DEBUG] removeTeamMember called:', { memberId });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return false;
+
+    // Fetch member with team to verify company access
+    const member = await prisma.teamMember.findUnique({
+      where: { id: memberId },
+      include: { team: true }
+    });
+    if (!member) return false;
+    await requireCompanyMatch(user.id, member.team.companyId);
 
     await prisma.teamMember.delete({
       where: { id: memberId }
     });
+
+    logAction('REMOVE_TEAM_MEMBER', user.id, { memberId, userId: member.userId, teamId: member.teamId });
 
     console.log('[DEBUG] Team member removed successfully');
     return true;
@@ -368,8 +470,16 @@ export async function removeTeamMember(memberId: string): Promise<boolean> {
  * Get all project permissions for a team
  */
 export async function getTeamProjectPermissions(teamId: string): Promise<ProjectTeamPermission[]> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return [];
+
+    // Fetch team to verify company access
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return [];
+    await requireCompanyMatch(user.id, team.companyId);
 
     const permissions = await prisma.projectTeamPermission.findMany({
       where: { teamId },
@@ -395,8 +505,16 @@ export async function getTeamProjectPermissions(teamId: string): Promise<Project
  * Get all teams with permissions for a project
  */
 export async function getProjectTeamPermissions(projectId: string): Promise<ProjectTeamPermission[]> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return [];
+
+    // Fetch project to verify company access
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return [];
+    await requireCompanyMatch(user.id, project.companyId);
 
     const permissions = await prisma.projectTeamPermission.findMany({
       where: { projectId },
@@ -448,8 +566,26 @@ export async function grantTeamProjectPermission(data: {
     grantedBy: data.grantedBy
   });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
+
+    // Fetch both team and project to verify company access
+    const team = await prisma.team.findUnique({ where: { id: data.teamId } });
+    const project = await prisma.project.findUnique({ where: { id: data.projectId } });
+
+    if (!team || !project) return null;
+
+    // Both team and project must belong to same company as authenticated user
+    await requireCompanyMatch(user.id, team.companyId);
+    await requireCompanyMatch(user.id, project.companyId);
+
+    // Team and project must belong to same company
+    if (team.companyId !== project.companyId) {
+      throw new Error('Team and project must belong to the same company');
+    }
 
     // Check if permission already exists
     const existing = await prisma.projectTeamPermission.findUnique({
@@ -463,7 +599,7 @@ export async function grantTeamProjectPermission(data: {
 
     if (existing) {
       // Update existing permissions
-      return await prisma.projectTeamPermission.update({
+      const updated = await prisma.projectTeamPermission.update({
         where: { id: existing.id },
         data: {
           canView: data.canView ?? true,
@@ -481,6 +617,14 @@ export async function grantTeamProjectPermission(data: {
           team: true
         }
       });
+
+      logAction('UPDATE_TEAM_PROJECT_PERMISSION', user.id, {
+        permissionId: updated.id,
+        teamId: data.teamId,
+        projectId: data.projectId
+      });
+
+      return updated;
     }
 
     // Create new permission
@@ -503,6 +647,12 @@ export async function grantTeamProjectPermission(data: {
         project: true,
         team: true
       }
+    });
+
+    logAction('GRANT_TEAM_PROJECT_PERMISSION', user.id, {
+      permissionId: permission.id,
+      teamId: data.teamId,
+      projectId: data.projectId
     });
 
     console.log('[DEBUG] Team project permission granted successfully');
@@ -530,8 +680,19 @@ export async function updateTeamProjectPermission(
     expiresAt?: Date;
   }
 ): Promise<ProjectTeamPermission | null> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return null;
+
+    // Fetch permission with team to verify company access
+    const permission = await prisma.projectTeamPermission.findUnique({
+      where: { id: permissionId },
+      include: { team: true }
+    });
+    if (!permission) return null;
+    await requireCompanyMatch(user.id, permission.team.companyId);
 
     const updated = await prisma.projectTeamPermission.update({
       where: { id: permissionId },
@@ -552,6 +713,13 @@ export async function updateTeamProjectPermission(
       }
     });
 
+    logAction('UPDATE_TEAM_PROJECT_PERMISSION', user.id, {
+      permissionId,
+      teamId: permission.teamId,
+      projectId: permission.projectId,
+      updates: Object.keys(data)
+    });
+
     return updated;
   } catch (error) {
     console.error('Error updating team project permission:', error);
@@ -565,11 +733,28 @@ export async function updateTeamProjectPermission(
 export async function revokeTeamProjectPermission(permissionId: string): Promise<boolean> {
   console.log('[DEBUG] revokeTeamProjectPermission called:', { permissionId });
 
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return false;
 
+    // Fetch permission with team to verify company access
+    const permission = await prisma.projectTeamPermission.findUnique({
+      where: { id: permissionId },
+      include: { team: true }
+    });
+    if (!permission) return false;
+    await requireCompanyMatch(user.id, permission.team.companyId);
+
     await prisma.projectTeamPermission.delete({
       where: { id: permissionId }
+    });
+
+    logAction('REVOKE_TEAM_PROJECT_PERMISSION', user.id, {
+      permissionId,
+      teamId: permission.teamId,
+      projectId: permission.projectId
     });
 
     console.log('[DEBUG] Team project permission revoked successfully');
@@ -588,8 +773,24 @@ export async function checkUserProjectPermission(
   projectId: string,
   permission: 'canView' | 'canCreatePoints' | 'canEditPoints' | 'canDeletePoints' | 'canExportReports' | 'canTestPoints' | 'canViewMap'
 ): Promise<boolean> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
   try {
     if (!prisma) return false;
+
+    // Verify access: authenticated user must match userId OR be from same company
+    if (user.id !== userId) {
+      const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+      if (!targetUser || targetUser.companyId !== user.companyId) {
+        throw new Error('Unauthorized: Cannot check permissions for users outside your company');
+      }
+    }
+
+    // Verify project access
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return false;
+    await requireCompanyMatch(user.id, project.companyId);
 
     // Get user's team memberships
     const memberships = await prisma.teamMember.findMany({
@@ -625,6 +826,17 @@ export async function checkUserProjectPermission(
  * Get all projects a user can access through team memberships
  */
 export async function getUserAccessibleProjects(userId: string): Promise<any[]> {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Users can only view their own accessible projects (unless checking for someone in their company)
+  if (user.id !== userId) {
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.companyId !== user.companyId) {
+      throw new Error('Unauthorized: Cannot access projects of users outside your company');
+    }
+  }
+
   try {
     if (!prisma) return [];
 

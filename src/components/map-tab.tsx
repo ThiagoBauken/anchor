@@ -156,7 +156,7 @@ export function MapTab({ onActiveFloorPlanChange }: { onActiveFloorPlanChange?: 
     const selectedFloorPlan = floorPlanId ? (floorPlans || []).find(fp => fp.id === floorPlanId) || null : null;
     setCurrentFloorPlan(selectedFloorPlan);
     if (onActiveFloorPlanChange && selectedFloorPlan) {
-      onActiveFloorPlanChange(selectedFloorPlan.image);
+      onActiveFloorPlanChange(selectedFloorPlan.id);
     }
   };
 

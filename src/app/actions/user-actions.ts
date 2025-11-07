@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma';
 import { localStorageUsers } from '@/lib/localStorage-fallback';
 import { requireAuthentication, requireCompanyMatch, requireRole, logAction } from '@/lib/auth-helpers';
 import { canInviteUsers, canManageTeams } from '@/lib/permissions';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export async function getUsersForCompany(companyId: string): Promise<User[]> {
   console.log('[DEBUG] getUsersForCompany server action called:', { companyId });
@@ -63,18 +65,26 @@ export async function addUser(
 
         // Generate default email and password if not provided
         const defaultEmail = email || `${name.toLowerCase().replace(/\s+/g, '.')}@anchorview.local`;
-        const defaultPassword = password || 'changeme123'; // In production, should hash this
+
+        // Generate secure random password if not provided
+        const plainPassword = password || crypto.randomBytes(16).toString('hex');
+
+        // Hash password with bcrypt (salt rounds = 10)
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
         const newUser = await prisma.user.create({
             data: {
                 name,
                 email: defaultEmail,
-                password: defaultPassword, // In production, should use bcrypt to hash
+                password: hashedPassword,
                 role,
                 companyId,
             },
         });
+
         console.log('[DEBUG] User created successfully in database:', newUser.id);
+        console.log('[INFO] Generated password for user (store this securely):', plainPassword);
+
         return newUser;
     } catch(e) {
         console.error("Error creating user, using localStorage fallback:", e);

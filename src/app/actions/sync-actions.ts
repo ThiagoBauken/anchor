@@ -5,9 +5,33 @@
 
 import { prisma } from '@/lib/prisma';
 import { AnchorPoint, AnchorTest } from '@/types';
+import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
 
 // Sincronizar pontos de ancoragem do offline para o banco
 export async function syncAnchorPoints(offlinePoints: any[]) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify all points belong to projects in the user's company
+  const projectIds = [...new Set(offlinePoints.map(p => p.projectId))];
+  const projects = await prisma.project.findMany({
+    where: {
+      id: { in: projectIds }
+    },
+    select: { id: true, companyId: true }
+  });
+
+  // Check all projects belong to user's company
+  for (const project of projects) {
+    await requireCompanyMatch(user.id, project.companyId);
+  }
+
+  // Log action
+  logAction('SYNC_ANCHOR_POINTS', user.id, {
+    pointCount: offlinePoints.length,
+    projectIds
+  });
+
   const results = {
     synced: 0,
     failed: 0,
@@ -63,6 +87,33 @@ export async function syncAnchorPoints(offlinePoints: any[]) {
 
 // Sincronizar testes de ancoragem
 export async function syncAnchorTests(offlineTests: any[]) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify all tests belong to anchor points in the user's company
+  const anchorPointIds = [...new Set(offlineTests.map(t => t.pontoId))];
+  const anchorPoints = await prisma.anchorPoint.findMany({
+    where: {
+      id: { in: anchorPointIds }
+    },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  // Check all anchor points belong to user's company
+  for (const point of anchorPoints) {
+    await requireCompanyMatch(user.id, point.project.companyId);
+  }
+
+  // Log action
+  logAction('SYNC_ANCHOR_TESTS', user.id, {
+    testCount: offlineTests.length,
+    anchorPointIds
+  });
+
   const results = {
     synced: 0,
     failed: 0,
@@ -102,8 +153,22 @@ export async function syncAnchorTests(offlineTests: any[]) {
   return results;
 }
 
-// Sincronizar fotos (base64) 
+// Sincronizar fotos (base64)
 export async function syncPhotos(offlinePhotos: any[]) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify all photos belong to the user's company
+  const companyIds = [...new Set(offlinePhotos.map(p => p.companyId).filter(Boolean))];
+  for (const companyId of companyIds) {
+    await requireCompanyMatch(user.id, companyId);
+  }
+
+  // Log action
+  logAction('SYNC_PHOTOS', user.id, {
+    photoCount: offlinePhotos.length
+  });
+
   const results = {
     synced: 0,
     failed: 0,
@@ -139,6 +204,32 @@ export async function syncPhotos(offlinePhotos: any[]) {
 
 // Buscar dados do servidor para cachear offline
 export async function fetchDataForOffline(companyId: string, projectId?: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, companyId);
+
+  // If projectId provided, verify it belongs to the company
+  if (projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { companyId: true }
+    });
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    if (project.companyId !== companyId) {
+      throw new Error('Project does not belong to the specified company');
+    }
+  }
+
+  // Log action
+  logAction('FETCH_DATA_FOR_OFFLINE', user.id, {
+    companyId,
+    projectId
+  });
+
   try {
     // Busca todos os dados necessários para trabalhar offline
     const [company, users, projects, locations] = await Promise.all([
@@ -187,12 +278,22 @@ export async function fetchDataForOffline(companyId: string, projectId?: string)
 }
 
 // Verificar status de sincronização
-export async function checkSyncStatus(lastSyncTime: string) {
+export async function checkSyncStatus(lastSyncTime: string, companyId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, companyId);
+
   try {
-    // Conta quantos registros foram modificados após última sync
+    // Conta quantos registros foram modificados após última sync na company do usuário
+    const projectIds = (await prisma.project.findMany({
+      where: { companyId },
+      select: { id: true }
+    })).map(p => p.id);
+
     const [pointsToSync, testsToSync] = await Promise.all([
       prisma.anchorPoint.count({
         where: {
+          projectId: { in: projectIds },
           dataHora: { gt: new Date(lastSyncTime) }
         }
       }),
@@ -224,6 +325,15 @@ export async function logSyncActivity(
   companyId: string,
   details: any
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+  await requireCompanyMatch(user.id, companyId);
+
+  // Verify the userId matches the authenticated user (users can only log their own activity)
+  if (user.id !== userId) {
+    throw new Error('Cannot log activity for another user');
+  }
+
   try {
     await prisma.saasActivityLog.create({
       data: {

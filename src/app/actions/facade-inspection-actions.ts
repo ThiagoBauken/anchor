@@ -11,10 +11,26 @@ import {
   FacadeSideType,
   PathologySeverity
 } from '@/types';
+import { requireAuthentication, requireCompanyMatch, logAction } from '@/lib/auth-helpers';
 
 // ===== FACADE INSPECTION CRUD =====
 
 export async function getInspectionsForProject(projectId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify user has access to this project's company
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  await requireCompanyMatch(user.id, project.companyId);
+
   try {
     const inspections = await prisma.facadeInspection.findMany({
       where: { projectId },
@@ -54,6 +70,25 @@ export async function getInspectionsForProject(projectId: string) {
 }
 
 export async function getInspectionById(inspectionId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // First get the inspection to check company access
+  const inspectionCheck = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspectionCheck) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspectionCheck.project.companyId);
+
   try {
     const inspection = await prisma.facadeInspection.findUnique({
       where: { id: inspectionId },
@@ -134,6 +169,27 @@ export async function createFacadeInspection(
   inspectorName?: string,
   engineerId?: string
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify user has access to this project's company
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  await requireCompanyMatch(user.id, project.companyId);
+
+  // Log action
+  logAction('CREATE_FACADE_INSPECTION', user.id, {
+    projectId,
+    inspectionName: name
+  });
+
   try {
     const inspection = await prisma.facadeInspection.create({
       data: {
@@ -172,6 +228,31 @@ export async function updateFacadeInspection(
     engineerId?: string;
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
+  // Log action
+  logAction('UPDATE_FACADE_INSPECTION', user.id, {
+    inspectionId,
+    updates: Object.keys(data)
+  });
+
   try {
     const updateData: any = { ...data };
 
@@ -202,6 +283,30 @@ export async function updateFacadeInspection(
 }
 
 export async function deleteFacadeInspection(inspectionId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
+  // Log action
+  logAction('DELETE_FACADE_INSPECTION', user.id, {
+    inspectionId
+  });
+
   try {
     await prisma.facadeInspection.delete({
       where: { id: inspectionId }
@@ -216,6 +321,25 @@ export async function deleteFacadeInspection(inspectionId: string) {
 // ===== FACADE SIDE CRUD =====
 
 export async function getFacadeSidesForInspection(inspectionId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
   try {
     const sides = await prisma.facadeSide.findMany({
       where: { inspectionId: inspectionId },
@@ -251,7 +375,32 @@ export async function createFacadeSide(
     imageHeight?: number;
   }
 ) {
-  try {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
+  // Log action
+  logAction('CREATE_FACADE_SIDE', user.id, {
+    inspectionId,
+    sideName: name
+  });
+
+  try{
     const side = await prisma.facadeSide.create({
       data: {
         inspectionId: inspectionId,
@@ -294,6 +443,35 @@ export async function updateFacadeSide(
     availableDivisions?: string[];
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via facade side
+  const facadeSide = await prisma.facadeSide.findUnique({
+    where: { id: sideId },
+    include: {
+      inspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!facadeSide) {
+    throw new Error('Facade side not found');
+  }
+
+  await requireCompanyMatch(user.id, facadeSide.inspection.project.companyId);
+
+  // Log action
+  logAction('UPDATE_FACADE_SIDE', user.id, {
+    sideId,
+    updates: Object.keys(data)
+  });
+
   try {
     const updateData: any = { ...data };
 
@@ -316,6 +494,34 @@ export async function updateFacadeSide(
 }
 
 export async function deleteFacadeSide(sideId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via facade side
+  const facadeSide = await prisma.facadeSide.findUnique({
+    where: { id: sideId },
+    include: {
+      inspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!facadeSide) {
+    throw new Error('Facade side not found');
+  }
+
+  await requireCompanyMatch(user.id, facadeSide.inspection.project.companyId);
+
+  // Log action
+  logAction('DELETE_FACADE_SIDE', user.id, {
+    sideId
+  });
+
   try {
     await prisma.facadeSide.delete({
       where: { id: sideId }
@@ -330,6 +536,21 @@ export async function deleteFacadeSide(sideId: string) {
 // ===== PATHOLOGY CATEGORY CRUD =====
 
 export async function getPathologyCategoriesForProject(projectId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify user has access to this project's company
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  await requireCompanyMatch(user.id, project.companyId);
+
   try {
     const categories = await prisma.pathologyCategory.findMany({
       where: { projectId },
@@ -350,6 +571,27 @@ export async function createPathologyCategory(
   order: number,
   description?: string
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify user has access to this project's company
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  await requireCompanyMatch(user.id, project.companyId);
+
+  // Log action
+  logAction('CREATE_PATHOLOGY_CATEGORY', user.id, {
+    projectId,
+    categoryName: name
+  });
+
   try {
     const category = await prisma.pathologyCategory.create({
       data: {
@@ -378,12 +620,37 @@ export async function updatePathologyCategory(
     description?: string;
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via category
+  const category = await prisma.pathologyCategory.findUnique({
+    where: { id: categoryId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!category) {
+    throw new Error('Pathology category not found');
+  }
+
+  await requireCompanyMatch(user.id, category.project.companyId);
+
+  // Log action
+  logAction('UPDATE_PATHOLOGY_CATEGORY', user.id, {
+    categoryId,
+    updates: Object.keys(data)
+  });
+
   try {
-    const category = await prisma.pathologyCategory.update({
+    const updatedCategory = await prisma.pathologyCategory.update({
       where: { id: categoryId },
       data
     });
-    return category;
+    return updatedCategory;
   } catch (error) {
     console.error('Error updating pathology category:', error);
     return null;
@@ -391,12 +658,37 @@ export async function updatePathologyCategory(
 }
 
 export async function togglePathologyCategoryActive(categoryId: string, active: boolean) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via category
+  const category = await prisma.pathologyCategory.findUnique({
+    where: { id: categoryId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!category) {
+    throw new Error('Pathology category not found');
+  }
+
+  await requireCompanyMatch(user.id, category.project.companyId);
+
+  // Log action
+  logAction('TOGGLE_PATHOLOGY_CATEGORY', user.id, {
+    categoryId,
+    active
+  });
+
   try {
-    const category = await prisma.pathologyCategory.update({
+    const updatedCategory = await prisma.pathologyCategory.update({
       where: { id: categoryId },
       data: { active }
     });
-    return category;
+    return updatedCategory;
   } catch (error) {
     console.error('Error toggling pathology category:', error);
     return null;
@@ -404,6 +696,30 @@ export async function togglePathologyCategoryActive(categoryId: string, active: 
 }
 
 export async function deletePathologyCategory(categoryId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via category
+  const category = await prisma.pathologyCategory.findUnique({
+    where: { id: categoryId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!category) {
+    throw new Error('Pathology category not found');
+  }
+
+  await requireCompanyMatch(user.id, category.project.companyId);
+
+  // Log action
+  logAction('DELETE_PATHOLOGY_CATEGORY', user.id, {
+    categoryId
+  });
+
   try {
     await prisma.pathologyCategory.delete({
       where: { id: categoryId }
@@ -418,6 +734,29 @@ export async function deletePathologyCategory(categoryId: string) {
 // ===== PATHOLOGY MARKER CRUD =====
 
 export async function getPathologyMarkersForFacadeSide(facadeSideId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via facade side
+  const facadeSide = await prisma.facadeSide.findUnique({
+    where: { id: facadeSideId },
+    include: {
+      inspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!facadeSide) {
+    throw new Error('Facade side not found');
+  }
+
+  await requireCompanyMatch(user.id, facadeSide.inspection.project.companyId);
+
   try {
     const markers = await prisma.pathologyMarker.findMany({
       where: { facadeSideId },
@@ -465,6 +804,35 @@ export async function createPathologyMarker(
     zIndex?: number;
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via facade side
+  const facadeSide = await prisma.facadeSide.findUnique({
+    where: { id: facadeSideId },
+    include: {
+      inspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!facadeSide) {
+    throw new Error('Facade side not found');
+  }
+
+  await requireCompanyMatch(user.id, facadeSide.inspection.project.companyId);
+
+  // Log action
+  logAction('CREATE_PATHOLOGY_MARKER', user.id, {
+    facadeSideId,
+    categoryId
+  });
+
   try {
     const marker = await prisma.pathologyMarker.create({
       data: {
@@ -524,8 +892,41 @@ export async function updatePathologyMarker(
     photos?: string[];
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via marker
+  const marker = await prisma.pathologyMarker.findUnique({
+    where: { id: markerId },
+    include: {
+      facadeSide: {
+        include: {
+          inspection: {
+            include: {
+              project: {
+                select: { companyId: true }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!marker) {
+    throw new Error('Pathology marker not found');
+  }
+
+  await requireCompanyMatch(user.id, marker.facadeSide.inspection.project.companyId);
+
+  // Log action
+  logAction('UPDATE_PATHOLOGY_MARKER', user.id, {
+    markerId,
+    updates: Object.keys(data)
+  });
+
   try {
-    const marker = await prisma.pathologyMarker.update({
+    const updatedMarker = await prisma.pathologyMarker.update({
       where: { id: markerId },
       data,
       include: {
@@ -539,7 +940,7 @@ export async function updatePathologyMarker(
         }
       }
     });
-    return marker;
+    return updatedMarker;
   } catch (error) {
     console.error('Error updating pathology marker:', error);
     return null;
@@ -547,6 +948,38 @@ export async function updatePathologyMarker(
 }
 
 export async function deletePathologyMarker(markerId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via marker
+  const marker = await prisma.pathologyMarker.findUnique({
+    where: { id: markerId },
+    include: {
+      facadeSide: {
+        include: {
+          inspection: {
+            include: {
+              project: {
+                select: { companyId: true }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!marker) {
+    throw new Error('Pathology marker not found');
+  }
+
+  await requireCompanyMatch(user.id, marker.facadeSide.inspection.project.companyId);
+
+  // Log action
+  logAction('DELETE_PATHOLOGY_MARKER', user.id, {
+    markerId
+  });
+
   try {
     await prisma.pathologyMarker.delete({
       where: { id: markerId }
@@ -561,6 +994,25 @@ export async function deletePathologyMarker(markerId: string) {
 // ===== INSPECTION REPORT CRUD =====
 
 export async function getReportsForInspection(inspectionId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
   try {
     const reports = await prisma.inspectionReport.findMany({
       where: { facadeInspectionId: inspectionId },
@@ -596,6 +1048,31 @@ export async function createInspectionReport(
   title: string,
   content: string
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via inspection
+  const inspection = await prisma.facadeInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      project: {
+        select: { companyId: true }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error('Inspection not found');
+  }
+
+  await requireCompanyMatch(user.id, inspection.project.companyId);
+
+  // Log action
+  logAction('CREATE_INSPECTION_REPORT', user.id, {
+    inspectionId,
+    reportNumber
+  });
+
   try {
     // Get the next version number
     const latestReport = await prisma.inspectionReport.findFirst({
@@ -640,8 +1117,37 @@ export async function updateInspectionReport(
     pdfUrl?: string;
   }
 ) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via report
+  const report = await prisma.inspectionReport.findUnique({
+    where: { id: reportId },
+    include: {
+      facadeInspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!report) {
+    throw new Error('Inspection report not found');
+  }
+
+  await requireCompanyMatch(user.id, report.facadeInspection.project.companyId);
+
+  // Log action
+  logAction('UPDATE_INSPECTION_REPORT', user.id, {
+    reportId,
+    updates: Object.keys(data)
+  });
+
   try {
-    const report = await prisma.inspectionReport.update({
+    const updatedReport = await prisma.inspectionReport.update({
       where: { id: reportId },
       data,
       include: {
@@ -661,7 +1167,7 @@ export async function updateInspectionReport(
         }
       }
     });
-    return report;
+    return updatedReport;
   } catch (error) {
     console.error('Error updating inspection report:', error);
     return null;
@@ -669,8 +1175,36 @@ export async function updateInspectionReport(
 }
 
 export async function approveInspectionReport(reportId: string, approvedBy: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via report
+  const report = await prisma.inspectionReport.findUnique({
+    where: { id: reportId },
+    include: {
+      facadeInspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!report) {
+    throw new Error('Inspection report not found');
+  }
+
+  await requireCompanyMatch(user.id, report.facadeInspection.project.companyId);
+
+  // Log action
+  logAction('APPROVE_INSPECTION_REPORT', user.id, {
+    reportId
+  });
+
   try {
-    const report = await prisma.inspectionReport.update({
+    const updatedReport = await prisma.inspectionReport.update({
       where: { id: reportId },
       data: {
         status: 'APPROVED',
@@ -694,7 +1228,7 @@ export async function approveInspectionReport(reportId: string, approvedBy: stri
         }
       }
     });
-    return report;
+    return updatedReport;
   } catch (error) {
     console.error('Error approving inspection report:', error);
     return null;
@@ -702,8 +1236,37 @@ export async function approveInspectionReport(reportId: string, approvedBy: stri
 }
 
 export async function rejectInspectionReport(reportId: string, rejectionReason: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via report
+  const report = await prisma.inspectionReport.findUnique({
+    where: { id: reportId },
+    include: {
+      facadeInspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!report) {
+    throw new Error('Inspection report not found');
+  }
+
+  await requireCompanyMatch(user.id, report.facadeInspection.project.companyId);
+
+  // Log action
+  logAction('REJECT_INSPECTION_REPORT', user.id, {
+    reportId,
+    rejectionReason
+  });
+
   try {
-    const report = await prisma.inspectionReport.update({
+    const updatedReport = await prisma.inspectionReport.update({
       where: { id: reportId },
       data: {
         status: 'rejected',
@@ -720,7 +1283,7 @@ export async function rejectInspectionReport(reportId: string, rejectionReason: 
         }
       }
     });
-    return report;
+    return updatedReport;
   } catch (error) {
     console.error('Error rejecting inspection report:', error);
     return null;
@@ -728,6 +1291,34 @@ export async function rejectInspectionReport(reportId: string, rejectionReason: 
 }
 
 export async function deleteInspectionReport(reportId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Check company access via report
+  const report = await prisma.inspectionReport.findUnique({
+    where: { id: reportId },
+    include: {
+      facadeInspection: {
+        include: {
+          project: {
+            select: { companyId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!report) {
+    throw new Error('Inspection report not found');
+  }
+
+  await requireCompanyMatch(user.id, report.facadeInspection.project.companyId);
+
+  // Log action
+  logAction('DELETE_INSPECTION_REPORT', user.id, {
+    reportId
+  });
+
   try {
     await prisma.inspectionReport.delete({
       where: { id: reportId }
@@ -742,6 +1333,26 @@ export async function deleteInspectionReport(reportId: string) {
 // ===== SEED DEFAULT CATEGORIES =====
 
 export async function seedDefaultPathologyCategories(projectId: string) {
+  // Authentication and authorization
+  const user = await requireAuthentication();
+
+  // Verify user has access to this project's company
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { companyId: true }
+  });
+
+  if (!project) {
+    throw new Error('Project not found');
+  }
+
+  await requireCompanyMatch(user.id, project.companyId);
+
+  // Log action
+  logAction('SEED_DEFAULT_PATHOLOGY_CATEGORIES', user.id, {
+    projectId
+  });
+
   try {
     const defaultCategories = [
       // CRÍTICOS (Vermelho/Laranja escuros)
