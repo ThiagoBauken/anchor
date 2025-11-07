@@ -1,0 +1,126 @@
+================================================================================
+CRITICAL BUG DIAGRAM: DOM Element ID Mismatch in Reports Export Flow
+================================================================================
+
+CORRECT FLOW (Expected):
+=======================
+
+MapTab Component
+├── state: currentFloorPlan = {
+│       id: "fp_a1b2c3d4",
+│       image: "data:image/png;base64,iVBORw0K...",
+│       name: "Planta Piso 1"
+│   }
+│
+├── Hidden Export Maps Render:
+│   └── <div id="export-map-fp_a1b2c3d4">  ← Element ID matches floor plan.id
+│       └── <InteractiveMap />
+│
+└── onActiveFloorPlanChange callback:
+    └── SHOULD PASS: floorPlan.id → "fp_a1b2c3d4"
+        (so export.ts can find element by getElementById)
+
+ReportsTab Component
+├── Receives callback: onActiveFloorPlanChange(floorPlan.id)
+├── state: activeFloorPlan = "fp_a1b2c3d4"
+└── export.ts line 123:
+    document.getElementById(`export-map-${activeFloorPlan}`)
+    = document.getElementById("export-map-fp_a1b2c3d4")  ✅ FOUND!
+
+================================================================================
+
+ACTUAL BROKEN FLOW (Current):
+=============================
+
+MapTab Component
+├── state: currentFloorPlan = {
+│       id: "fp_a1b2c3d4",
+│       image: "data:image/png;base64,iVBORw0K...",
+│       name: "Planta Piso 1"
+│   }
+│
+├── Hidden Export Maps Render:
+│   └── <div id="export-map-fp_a1b2c3d4">  ← ID is fp_a1b2c3d4
+│       └── <InteractiveMap />
+│
+└── onActiveFloorPlanChange callback:
+    └── ACTUALLY PASSES: floorPlan.image → "data:image/png;base64,iVBORw0K..."
+        ❌ WRONG! This is the image URL, not the ID!
+
+ReportsTab Component (map-tab.tsx line 254)
+├── <MapTab onActiveFloorPlanChange={setActiveFloorPlan}/>
+│
+├── Inside MapTab, line 158-160:
+│   if (onActiveFloorPlanChange && selectedFloorPlan) {
+│       onActiveFloorPlanChange(selectedFloorPlan.image)  ← PASSES IMAGE URL!
+│   }
+│
+├── ReportsTab receives: activeFloorPlan = "data:image/png;base64,iVBORw0K..."
+└── export.ts line 123:
+    document.getElementById(`export-map-${activeFloorPlan}`)
+    = document.getElementById("export-map-data:image/png;base64,iVBORw0K...")
+    ❌ INVALID ID! Contains special characters and is way too long
+    ❌ getElementById returns null
+    ❌ mapImage = '' (empty)
+    ❌ PDF/DOCX generated WITHOUT floor plan map
+
+================================================================================
+
+THE FIX:
+========
+
+Option 1: Change MapTab callback to pass ID instead of image
+(In map-tab.tsx, line 158-160):
+
+BEFORE:
+    if (onActiveFloorPlanChange && selectedFloorPlan) {
+        onActiveFloorPlanChange(selectedFloorPlan.image);
+    }
+
+AFTER:
+    if (onActiveFloorPlanChange && selectedFloorPlan) {
+        onActiveFloorPlanChange(selectedFloorPlan.id);  // Pass ID, not image!
+    }
+
+Then in export.ts, we already have the correct logic:
+    const mapElement = activeFloorPlan ? 
+        document.getElementById(`export-map-${activeFloorPlan}`) : null;
+    // Now activeFloorPlan is "fp_a1b2c3d4" and this works!
+
+================================================================================
+
+Option 2: Change ReportsTab to track floor plan ID instead of image
+
+Current implementation (broken):
+    const [activeFloorPlan, setActiveFloorPlan] = useState(
+        currentProject?.floorPlanImages?.[0] || ''
+    );
+    
+    <MapTab onActiveFloorPlanChange={setActiveFloorPlan}/>
+
+Better implementation:
+    const [activeFloorPlanId, setActiveFloorPlanId] = useState(
+        floorPlans[0]?.id || null
+    );
+    
+    <MapTab onActiveFloorPlanChange={setActiveFloorPlanId}/>
+    
+    // In export functions:
+    await generatePdfReport(..., activeFloorPlanId);
+
+================================================================================
+
+IMPACT WHEN FIXED:
+==================
+
+✅ PDF reports will include floor plan maps
+✅ DOCX reports will include floor plan maps
+✅ Section 7 (Mapa dos Pontos) will display correctly
+✅ All export formats will work properly
+✅ No file size waste from empty image placeholders
+✅ Reports will be complete and ready for printing
+
+Estimated fix time: 15-30 minutes
+Risk level: Very low (isolated change, highly testable)
+
+================================================================================
