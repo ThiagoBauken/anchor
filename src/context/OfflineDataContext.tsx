@@ -220,8 +220,31 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
           console.log('⚠️ No floor plans available for project')
         }
       } catch (error) {
-        console.error('❌ Error loading floor plans:', error)
-        setFloorPlans([])
+        console.error('❌ Error loading floor plans from server, trying localStorage fallback:', error)
+
+        // Fallback to localStorage
+        try {
+          const storedFloorPlans = localStorage.getItem('anchorViewFloorPlans')
+          if (storedFloorPlans) {
+            const allFloorPlans: FloorPlan[] = JSON.parse(storedFloorPlans)
+            const projectFloorPlans = allFloorPlans.filter(fp => fp.projectId === currentProject.id)
+            setFloorPlans(projectFloorPlans)
+            console.log('✅ Loaded floor plans from localStorage:', projectFloorPlans.length)
+
+            // Auto-select first active floor plan
+            if (projectFloorPlans.length > 0 && !currentFloorPlan) {
+              const firstActive = projectFloorPlans.find(fp => fp.active)
+              const floorPlanToSelect = firstActive || projectFloorPlans[0]
+              setCurrentFloorPlan(floorPlanToSelect)
+              console.log('🎯 Auto-selected floor plan from localStorage:', floorPlanToSelect.name)
+            }
+          } else {
+            setFloorPlans([])
+          }
+        } catch (localStorageError) {
+          console.error('❌ Error loading from localStorage:', localStorageError)
+          setFloorPlans([])
+        }
       }
     }
 

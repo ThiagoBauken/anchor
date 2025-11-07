@@ -7,6 +7,7 @@ import type { AnchorPoint, MarkerShape } from '@/types';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { PointForm } from './point-form';
+import { canEditMap } from '@/lib/permissions';
 
 const LABEL_OFFSET_THRESHOLD = 30; // Min distance between points to trigger alternating labels
 
@@ -320,8 +321,8 @@ export function InteractiveMap({
     // This was a click
     setIsPanning(false);
 
-    // Only superadmin and team_admin can add points (company_admin is view-only)
-    const canAddPoint = (currentUser?.role === 'superadmin' || currentUser?.role === 'team_admin') && !lineToolMode;
+    // Check if user has permission to edit map and add points
+    const canAddPoint = currentUser && canEditMap({ user: currentUser, projectId: currentProject?.id }) && !lineToolMode;
 
     if (!canAddPoint || !svgRef.current) return;
 

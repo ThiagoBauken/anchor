@@ -42,7 +42,7 @@ export function canEditMap(context: PermissionContext): boolean {
 /**
  * Verifica se o usuário pode criar pontos de ancoragem
  * - superadmin: pode criar pontos
- * - company_admin: pode criar pontos
+ * - company_admin: NÃO pode criar pontos (view-only)
  * - team_admin: pode criar pontos nos projetos atribuídos
  * - technician: NÃO pode criar pontos (só realiza testes)
  */
@@ -54,7 +54,7 @@ export function canCreatePoints(context: PermissionContext): boolean {
   }
 
   if (user.role === 'company_admin') {
-    return true;
+    return false; // Company admins têm acesso view-only aos mapas
   }
 
   if (user.role === 'team_admin') {
