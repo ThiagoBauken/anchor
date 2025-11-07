@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { requireAuth, requireProjectAccess } from '@/middleware/auth-middleware';
-
-const prisma = new PrismaClient();
 
 /**
  * POST /api/sync/photos

@@ -723,12 +723,20 @@ export interface Team {
   cnpj?: string;
   email?: string;
   phone?: string;
-  logo?: string; // base64 data URL
+  address?: string; // Endereço da empresa
+  logo?: string; // base64 data URL ou URL pública
+  website?: string; // Site da empresa
   certifications: string[]; // Array de certificações (ISO, NR-35, etc)
   insurancePolicy?: string; // Número da apólice de seguro
-  insuranceExpiry?: string; // Data de vencimento do seguro
+  insuranceExpiry?: Date | string; // Data de vencimento do seguro
+  insuranceValue?: number; // Valor da apólice
+  managerName?: string; // Nome do responsável
+  managerPhone?: string; // Telefone do responsável
+  managerEmail?: string; // Email do responsável
   active: boolean;
-  createdAt: string;
+  notes?: string; // Observações internas
+  createdAt: Date | string;
+  updatedAt: Date | string;
 
   // Relations
   company?: Company;
@@ -741,8 +749,9 @@ export interface TeamMember {
   id: string;
   teamId: string;
   userId: string;
-  role: 'leader' | 'member' | 'observer';
-  joinedAt: string;
+  role: 'leader' | 'member' | 'observer'; // Enum: TeamMemberRole no Prisma
+  active: boolean; // Membro ativo ou removido
+  joinedAt: Date | string;
 
   // Relations
   team?: Team;
@@ -754,12 +763,17 @@ export interface ProjectTeamPermission {
   id: string;
   projectId: string;
   teamId: string;
-  canView: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canExport: boolean;
-  canManageTests: boolean;
-  grantedAt: string;
+  canView: boolean; // Visualizar projeto
+  canCreatePoints: boolean; // Criar novos pontos
+  canEditPoints: boolean; // Editar pontos existentes
+  canDeletePoints: boolean; // Deletar pontos
+  canTestPoints: boolean; // Realizar testes
+  canExportReports: boolean; // Exportar relatórios
+  canViewMap: boolean; // Visualizar mapa
+  grantedBy: string; // ID do usuário que concedeu
+  grantedAt: Date | string;
+  expiresAt?: Date | string; // Permissão com prazo de validade
+  notes?: string; // Observações sobre a permissão
 
   // Relations
   project?: Project;
