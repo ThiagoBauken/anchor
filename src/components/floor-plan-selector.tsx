@@ -39,7 +39,9 @@ export function FloorPlanSelector({
   const [newFloorPlanImage, setNewFloorPlanImage] = useState('');
   const [newFloorPlanOrder, setNewFloorPlanOrder] = useState(0);
 
-  const sortedFloorPlans = [...floorPlans].sort((a, b) => a.order - b.order);
+  const sortedFloorPlans = [...floorPlans].sort((a, b) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
   const activeFloorPlan = floorPlans.find(fp => fp.id === activeFloorPlanId);
 
   const handleAddFloorPlan = async () => {
