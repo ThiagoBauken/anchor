@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerUser, loginUser, logoutUser, getCurrentUser } from '@/app/actions/auth'
 import { useToast } from '@/hooks/use-toast'
@@ -48,16 +48,11 @@ export function DatabaseAuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const { toast } = useToast()
 
-  // Load user on mount
-  useEffect(() => {
-    refreshUser()
-  }, [])
-
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     try {
       setIsLoading(true)
       const currentUser = await getCurrentUser()
-      
+
       if (currentUser) {
         setUser({
           id: currentUser.id,
@@ -78,7 +73,12 @@ export function DatabaseAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  // Load user on mount
+  useEffect(() => {
+    refreshUser()
+  }, [refreshUser])
 
   const login = async (email: string, password: string) => {
     try {

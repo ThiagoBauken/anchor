@@ -162,22 +162,6 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     [currentProject, getPointsByProject]
   )
 
-  // Load data when authentication changes
-  useEffect(() => {
-    if (isAuthenticated && currentCompany) {
-      refreshData()
-    } else {
-      // Clear data when logged out
-      setUsers([])
-      setProjects([])
-      setLocations([])
-      setPoints([])
-      setTests([])
-      setCurrentProject(null)
-      setCurrentLocation(null)
-    }
-  }, [isAuthenticated, currentCompany])
-
   // Persist current project selection
   useEffect(() => {
     if (currentProject) {
@@ -316,7 +300,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     autoSyncOnBoot()
   }, [isAuthenticated, currentCompany])
 
-  const refreshData = async (): Promise<void> => {
+  const refreshData = useCallback(async (): Promise<void> => {
     if (!currentCompany || !currentUser) return
 
     setIsLoading(true)
@@ -389,7 +373,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
           setCurrentProject(loadedProjects[0])
         }
       }
-      
+
       console.log(`✅ Data loaded: ${loadedUsers.length} users, ${loadedProjects.length} projects, ${loadedPoints.length} points`)
 
       // Try to sync in background
@@ -400,7 +384,23 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentCompany, currentUser, currentProject])
+
+  // Load data when authentication changes
+  useEffect(() => {
+    if (isAuthenticated && currentCompany) {
+      refreshData()
+    } else {
+      // Clear data when logged out
+      setUsers([])
+      setProjects([])
+      setLocations([])
+      setPoints([])
+      setTests([])
+      setCurrentProject(null)
+      setCurrentLocation(null)
+    }
+  }, [isAuthenticated, currentCompany, refreshData])
 
   // Project methods
   const createProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> => {
@@ -1054,27 +1054,16 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     setLastSelectedLocation,
     setLastInstallationDate
   }), [
-    // State dependencies
+    // State dependencies - only include state values, not functions
     users, projects, locations, floorPlans, points, tests,
     currentProject, currentLocation, currentFloorPlan, testPointId, currentUser,
     showArchived, lineToolMode, lineToolStartPointId, lineToolEndPointId, lineToolPreviewPoints,
     inspectionFlags, allPointsForProject, activeTab, isLoading,
-    lastSelectedLocation, lastInstallationDate,
-    // Getter functions (memoized by reference)
-    getUsersForCompany, getProjectsForCompany, getLocationsForCompany,
-    getPointsByProject, getTestsByPoint, getPointById, getProjectById,
-    // Action functions (stable references from useState)
-    setCurrentProject, setCurrentLocation, setCurrentFloorPlan, setTestPointId,
-    setLineToolStartPointId, setLineToolEndPointId, setLineToolMode, setLineToolPreviewPoints,
-    setShowArchived, setActiveTab, setLastSelectedLocation, setLastInstallationDate,
-    // Methods
-    createProject, updateProject, deleteProject,
-    createUser, updateUser, addUser, deleteUser,
-    createLocation, updateLocation, updateLocationShape, deleteLocation,
-    createFloorPlan, updateFloorPlan, deleteFloorPlan, toggleFloorPlanActive,
-    createPoint, updatePoint, deletePoint, unarchivePoint, addMultiplePoints,
-    createTest, updatePointsAndAddTest,
-    resetLineTool, refreshData
+    lastSelectedLocation, lastInstallationDate
+    // Note: Functions are excluded from dependencies because:
+    // - useState setters have stable references (don't change between renders)
+    // - Other functions use these stable setters internally
+    // - Including them would cause infinite re-render loops
   ])
 
   return (
