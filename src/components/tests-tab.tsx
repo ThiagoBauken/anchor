@@ -17,7 +17,8 @@ import type { AnchorTestResult } from "@/types";
 import { CameraCapture } from "./camera-capture";
 import CameraCaptureCapacitor from "./camera-capture-capacitor";
 import { isCapacitorAvailable } from "@/lib/gallery-photo-service";
-import { Search, MapPin, X } from "lucide-react";
+import { Search, MapPin, X, ShieldAlert } from "lucide-react";
+import { canPerformTests } from "@/lib/permissions";
 
 const testSchema = z.object({
   pontoId: z.string().min(1, "Selecione um ponto para testar."),
@@ -36,6 +37,42 @@ type TestFormData = z.infer<typeof testSchema>;
 export function TestsTab() {
   const { points, updatePointsAndAddTest, currentUser, currentProject, testPointId, setTestPointId, getPointById, locations } = useOfflineData();
   const { toast } = useToast();
+
+  // Permission check - Technicians and above can perform tests
+  const userCanPerformTests = currentUser ? canPerformTests({ user: currentUser }) : false;
+
+  // Show access denied if user doesn't have permission
+  if (!currentUser) {
+    return (
+      <Card className="mt-4 bg-destructive/10 border-destructive">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-5 w-5" />
+            Autenticação Necessária
+          </CardTitle>
+          <CardDescription>
+            Você precisa estar logado para realizar testes.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (!userCanPerformTests) {
+    return (
+      <Card className="mt-4 bg-destructive/10 border-destructive">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-5 w-5" />
+            Acesso Negado
+          </CardTitle>
+          <CardDescription>
+            Você não tem permissão para realizar testes. Apenas técnicos, team admins, company admins e superadmins podem realizar testes.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
