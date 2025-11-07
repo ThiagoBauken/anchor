@@ -1,6 +1,5 @@
 
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { PwaInstaller } from "@/components/pwa-installer";
@@ -9,7 +8,9 @@ import { ErrorSuppressor } from "@/components/error-suppressor";
 import { PullToRefreshPreventer } from "@/components/pull-to-refresh-preventer";
 import { ThemeProvider } from "@/context/ThemeContext";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Font import disabled for offline builds - use system fonts
+// import { Inter } from "next/font/google";
+// const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "AnchorView",
@@ -37,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <ThemeProvider
           defaultTheme="system"
           storageKey="anchorview-ui-theme"

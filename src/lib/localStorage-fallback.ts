@@ -52,7 +52,7 @@ export const localStorageProjects = {
         updatedAt: now
       };
     }
-    
+
     const projects = JSON.parse(localStorage.getItem('anchor-projects') || '[]') as LocalStorageProject[];
     const now = new Date();
     const newProject: LocalStorageProject = {
@@ -62,13 +62,36 @@ export const localStorageProjects = {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString()
     };
-    
+
     projects.push(newProject);
     localStorage.setItem('anchor-projects', JSON.stringify(projects));
-    
+
     return {
       ...newProject,
       createdAt: now,
+      updatedAt: now
+    };
+  },
+
+  update: (id: string, updates: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): Project | null => {
+    if (!isLocalStorageAvailable()) return null;
+
+    const projects = JSON.parse(localStorage.getItem('anchor-projects') || '[]') as LocalStorageProject[];
+    const index = projects.findIndex(p => p.id === id);
+    if (index === -1) return null;
+
+    const now = new Date();
+    projects[index] = {
+      ...projects[index],
+      ...updates,
+      updatedAt: now.toISOString()
+    };
+
+    localStorage.setItem('anchor-projects', JSON.stringify(projects));
+
+    return {
+      ...projects[index],
+      createdAt: new Date(projects[index].createdAt),
       updatedAt: now
     };
   },

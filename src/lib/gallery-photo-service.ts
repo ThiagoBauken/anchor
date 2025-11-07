@@ -456,7 +456,7 @@ export async function getPendingPhotoMetadata(): Promise<PhotoMetadata[]> {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const index = store.index('uploaded');
-    const request = index.getAll(false); // uploaded === false
+    const request = index.getAll(IDBKeyRange.only(false)); // uploaded === false
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || []);
