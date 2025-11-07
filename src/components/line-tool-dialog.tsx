@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAnchorData } from "@/context/AnchorDataContext";
+import { useOfflineData } from "@/context/OfflineDataContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -16,11 +16,11 @@ interface LineToolDialogProps {
 }
 
 export function LineToolDialog({ isOpen, onOpenChange }: LineToolDialogProps) {
-    const { 
-        lineToolStartPointId, lineToolEndPointId, getPointById, resetLineTool, 
+    const {
+        lineToolStartPointId, lineToolEndPointId, getPointById, resetLineTool,
         setLineToolMode, currentProject, points, addMultiplePoints,
         setLineToolPreviewPoints
-    } = useAnchorData();
+    } = useOfflineData();
     const [numPointsToAdd, setNumPointsToAdd] = useState(1);
     const [spacing, setSpacing] = useState(2.0); // meters between points
     const [useSpacing, setUseSpacing] = useState(false);

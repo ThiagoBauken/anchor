@@ -43,6 +43,9 @@ interface OfflineDataContextType {
   // Map tool actions
   setLineToolStartPoint: (pointId: string | null) => void
   setLineToolEndPoint: (pointId: string | null) => void
+  setLineToolMode: (mode: boolean) => void
+  setLineToolPreviewPoints: (points: { x: number; y: number }[]) => void
+  resetLineTool: () => void
   setShowArchived: (show: boolean) => void
   
   // Data methods
@@ -69,6 +72,7 @@ interface OfflineDataContextType {
   updatePoint: (point: AnchorPoint) => Promise<void>
   deletePoint: (pointId: string) => Promise<void>
   unarchivePoint: (pointId: string) => Promise<void>
+  addMultiplePoints: (points: Omit<AnchorPoint, 'id' | 'dataHora' | 'status' | 'createdByUserId' | 'lastModifiedByUserId' | 'archived'>[]) => Promise<void>
   
   createTest: (test: Omit<AnchorTest, 'id' | 'dataHora'>) => Promise<AnchorTest>
   updatePointsAndAddTest: (pontoId: string, testData: Omit<AnchorTestResult, 'id' | 'dataHora' | 'pontoId' | 'createdByUserId'>, pointUpdates: Partial<AnchorPoint>) => void
@@ -813,8 +817,36 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     if (point) {
       await updatePoint({ ...point, archived: false })
     }
-    
+
     console.log('✅ Point unarchived offline:', pointId)
+  }
+
+  const addMultiplePoints = async (
+    pointsData: Omit<AnchorPoint, 'id' | 'dataHora' | 'status' | 'createdByUserId' | 'lastModifiedByUserId' | 'archived'>[]
+  ): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('Not authenticated')
+    }
+
+    const newPoints: AnchorPoint[] = pointsData.map(pointData => ({
+      ...pointData,
+      id: `point_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      dataHora: new Date().toISOString(),
+      status: 'Não Testado',
+      createdByUserId: currentUser.id,
+      lastModifiedByUserId: currentUser.id,
+      archived: false
+    }))
+
+    // Save all points to IndexedDB
+    for (const point of newPoints) {
+      await offlineDB.createPoint(point)
+    }
+
+    // Update local state
+    setPoints(prev => [...prev, ...newPoints])
+
+    console.log(`✅ ${newPoints.length} points created offline via line tool`)
   }
 
   // Test methods
@@ -920,6 +952,14 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     return points.find(p => p.id === id) || null
   }
 
+  // Line tool reset function
+  const resetLineTool = () => {
+    setLineToolMode(false)
+    setLineToolStartPointId(null)
+    setLineToolEndPointId(null)
+    setLineToolPreviewPoints([])
+  }
+
   const contextValue: OfflineDataContextType = {
     // Data state
     users: getUsersForCompany(),
@@ -947,6 +987,9 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     // Map tool actions
     setLineToolStartPoint: setLineToolStartPointId,
     setLineToolEndPoint: setLineToolEndPointId,
+    setLineToolMode,
+    setLineToolPreviewPoints,
+    resetLineTool,
     setShowArchived,
     
     // Map UI state
@@ -978,6 +1021,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     updatePoint,
     deletePoint,
     unarchivePoint,
+    addMultiplePoints,
     createTest,
     updatePointsAndAddTest,
     
