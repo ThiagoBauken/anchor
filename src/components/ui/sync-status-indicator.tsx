@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Wifi, WifiOff, RefreshCw, Check, AlertCircle, Clock } from 'lucide-react';
 import { hybridDataManager } from '@/lib/hybrid-data-manager';
+import { useOfflineData } from '@/context/OfflineDataContext';
 
 interface SyncStatusIndicatorProps {
   onManualSync?: () => void;
@@ -19,6 +20,7 @@ export function SyncStatusIndicator({
   compact = false
 }: SyncStatusIndicatorProps) {
   const router = useRouter();
+  const { refreshData } = useOfflineData();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [pendingItems, setPendingItems] = useState(0);
@@ -55,15 +57,20 @@ export function SyncStatusIndicator({
 
   const handleSync = async () => {
     if (!isOnline || syncInProgress) return;
-    
+
     setSyncInProgress(true);
-    
+
     try {
       if (onManualSync) {
         await onManualSync();
       } else {
         await hybridDataManager.manualSync();
       }
+
+      // Refresh data from server after successful sync
+      console.log('🔄 Refreshing data from server after sync...');
+      await refreshData();
+
       updateStatus();
     } catch (error) {
       console.error('Erro na sincronização:', error);
