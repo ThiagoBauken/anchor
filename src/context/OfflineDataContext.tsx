@@ -169,6 +169,13 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     }
   }, [currentProject])
 
+  // Persist current floor plan selection
+  useEffect(() => {
+    if (currentFloorPlan) {
+      localStorage.setItem('anchorViewCurrentFloorPlan', JSON.stringify(currentFloorPlan))
+    }
+  }, [currentFloorPlan])
+
   // Load floor plans when current project changes
   useEffect(() => {
     const loadFloorPlans = async () => {
@@ -202,16 +209,36 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
         setFloorPlans(convertedFloorPlans)
         console.log('✅ Floor plans loaded:', convertedFloorPlans.length)
 
+        // Try to restore previously selected floor plan from localStorage
+        let floorPlanToRestore: FloorPlan | null = null
+        try {
+          const savedFloorPlanStr = localStorage.getItem('anchorViewCurrentFloorPlan')
+          if (savedFloorPlanStr) {
+            const savedFloorPlan = JSON.parse(savedFloorPlanStr)
+            // Only restore if it belongs to current project
+            if (savedFloorPlan.projectId === currentProject.id) {
+              // Verify it still exists in loaded floor plans
+              const foundFloorPlan = convertedFloorPlans.find(fp => fp.id === savedFloorPlan.id)
+              if (foundFloorPlan) {
+                floorPlanToRestore = foundFloorPlan
+                console.log('🔄 Restoring previously selected floor plan:', foundFloorPlan.name)
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to restore floor plan from localStorage:', e)
+        }
+
         // Auto-select floor plan logic:
         // 1. Check if current floor plan belongs to this project
-        // 2. If not, or if no floor plan selected, auto-select first active one
+        // 2. If not, or if no floor plan selected, auto-select first active one or restored one
         const needsNewSelection = !currentFloorPlan ||
                                   currentFloorPlan.projectId !== currentProject.id
 
         if (needsNewSelection && convertedFloorPlans.length > 0) {
-          // Prefer first active floor plan
+          // Prefer restored floor plan, then first active floor plan
           const firstActive = convertedFloorPlans.find(fp => fp.active)
-          const floorPlanToSelect = firstActive || convertedFloorPlans[0]
+          const floorPlanToSelect = floorPlanToRestore || firstActive || convertedFloorPlans[0]
           setCurrentFloorPlan(floorPlanToSelect)
           console.log('🎯 Auto-selected floor plan:', floorPlanToSelect.name, '(reason:', !currentFloorPlan ? 'no selection' : 'wrong project', ')')
         } else if (!needsNewSelection && currentFloorPlan) {
@@ -231,10 +258,29 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
             setFloorPlans(projectFloorPlans)
             console.log('✅ Loaded floor plans from localStorage:', projectFloorPlans.length)
 
-            // Auto-select first active floor plan
-            if (projectFloorPlans.length > 0 && !currentFloorPlan) {
+            // Try to restore previously selected floor plan
+            let floorPlanToRestore: FloorPlan | null = null
+            try {
+              const savedFloorPlanStr = localStorage.getItem('anchorViewCurrentFloorPlan')
+              if (savedFloorPlanStr) {
+                const savedFloorPlan = JSON.parse(savedFloorPlanStr)
+                if (savedFloorPlan.projectId === currentProject.id) {
+                  const foundFloorPlan = projectFloorPlans.find(fp => fp.id === savedFloorPlan.id)
+                  if (foundFloorPlan) {
+                    floorPlanToRestore = foundFloorPlan
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Failed to restore floor plan:', e)
+            }
+
+            // Auto-select floor plan if needed
+            const needsNewSelection = !currentFloorPlan || currentFloorPlan.projectId !== currentProject.id
+
+            if (projectFloorPlans.length > 0 && needsNewSelection) {
               const firstActive = projectFloorPlans.find(fp => fp.active)
-              const floorPlanToSelect = firstActive || projectFloorPlans[0]
+              const floorPlanToSelect = floorPlanToRestore || firstActive || projectFloorPlans[0]
               setCurrentFloorPlan(floorPlanToSelect)
               console.log('🎯 Auto-selected floor plan from localStorage:', floorPlanToSelect.name)
             }
