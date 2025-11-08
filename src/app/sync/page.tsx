@@ -26,7 +26,6 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { hybridDataManager } from '@/lib/hybrid-data-manager';
-import { useOfflineData } from '@/context/OfflineDataContext';
 
 // Force this page to be dynamically rendered
 export const dynamic = 'force-dynamic';
@@ -44,7 +43,6 @@ interface PendingItem {
 
 export default function SyncPage() {
   const router = useRouter();
-  const { refreshData } = useOfflineData();
   const [isOnline, setIsOnline] = useState(true);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [pendingItems, setPendingItems] = useState({ points: 0, tests: 0, total: 0 });
@@ -138,11 +136,12 @@ export default function SyncPage() {
         setLastSyncTime(now);
         localStorage.setItem('lastSyncTime', now);
 
-        // Refresh data from server to get updated state
-        console.log('🔄 Refreshing data from server after sync...');
-        await refreshData();
-
         loadSyncStatus(); // Atualiza contadores
+
+        // Reload page after short delay to show success message
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       }
     } catch (error) {
       setSyncResults({
