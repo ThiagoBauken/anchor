@@ -430,12 +430,14 @@ export class HybridDataManager {
 
   private getPendingPointsForSync(): any[] {
     const points = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
-    return points.filter((p: any) => p.syncStatus === 'pending');
+    // Items without syncStatus OR with 'pending' status need to be synced
+    return points.filter((p: any) => !p.syncStatus || p.syncStatus === 'pending');
   }
 
   private getPendingTestsForSync(): any[] {
     const tests = JSON.parse(localStorage.getItem('anchorViewTests') || '[]');
-    return tests.filter((t: any) => t.syncStatus === 'pending');
+    // Items without syncStatus OR with 'pending' status need to be synced
+    return tests.filter((t: any) => !t.syncStatus || t.syncStatus === 'pending');
   }
 
   private async syncPointToServer(point: any) {

@@ -549,16 +549,45 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
   }
 
   const deleteProject = async (projectId: string): Promise<void> => {
-    // Soft delete
-    const project = projects.find(p => p.id === projectId)
-    if (project) {
-      await updateProject({ ...project, deleted: true } as any)
+    // Import server action dynamically
+    const { deleteProject: deleteProjectAction } = await import('@/app/actions/project-actions')
+
+    try {
+      // Try to delete on server first
+      console.log('[DEBUG] Attempting to delete project on server...')
+      const success = await deleteProjectAction(projectId)
+
+      if (success) {
+        console.log('✅ Project deleted on server:', projectId)
+
+        // Also remove from IndexedDB
+        const project = projects.find(p => p.id === projectId)
+        if (project) {
+          await offlineDB.put('projects', { ...project, deleted: true } as any)
+        }
+
+        // Update local state
+        setProjects(prev => prev.filter(p => p.id !== projectId))
+
+        return
+      }
+
+      throw new Error('Failed to delete project on server')
+
+    } catch (error) {
+      console.warn('[WARN] Server delete failed, using offline fallback:', error)
+
+      // Fallback: soft delete in IndexedDB only
+      const project = projects.find(p => p.id === projectId)
+      if (project) {
+        await offlineDB.put('projects', { ...project, deleted: true } as any)
+      }
+
+      // Update local state
+      setProjects(prev => prev.filter(p => p.id !== projectId))
+
+      console.log('✅ Project deleted offline (fallback):', projectId)
     }
-    
-    // Update local state
-    setProjects(prev => prev.filter(p => p.id !== projectId))
-    
-    console.log('✅ Project deleted offline:', projectId)
   }
 
   // User methods

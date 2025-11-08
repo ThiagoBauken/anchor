@@ -15,7 +15,7 @@ export interface PermissionContext {
 /**
  * Verifica se o usuário pode editar mapas
  * - superadmin: pode editar todos os mapas
- * - company_admin: apenas visualiza (não edita)
+ * - company_admin: PODE editar (TEMPORÁRIO até implementar Teams)
  * - team_admin: pode editar mapas dos projetos atribuídos à sua equipe
  * - technician: não pode editar mapas
  */
@@ -27,7 +27,9 @@ export function canEditMap(context: PermissionContext): boolean {
   }
 
   if (user.role === 'company_admin') {
-    return false; // Company admins só visualizam
+    // TODO: Após implementar Teams, restringir a view-only
+    // Por enquanto, permite edição para não bloquear fluxo atual
+    return true;
   }
 
   if (user.role === 'team_admin') {
@@ -42,7 +44,7 @@ export function canEditMap(context: PermissionContext): boolean {
 /**
  * Verifica se o usuário pode criar pontos de ancoragem
  * - superadmin: pode criar pontos
- * - company_admin: NÃO pode criar pontos (view-only)
+ * - company_admin: PODE criar (TEMPORÁRIO até implementar Teams)
  * - team_admin: pode criar pontos nos projetos atribuídos
  * - technician: NÃO pode criar pontos (só realiza testes)
  */
@@ -54,7 +56,9 @@ export function canCreatePoints(context: PermissionContext): boolean {
   }
 
   if (user.role === 'company_admin') {
-    return false; // Company admins têm acesso view-only aos mapas
+    // TODO: Após implementar Teams, restringir a view-only
+    // Por enquanto, permite criação para não bloquear fluxo atual
+    return true;
   }
 
   if (user.role === 'team_admin') {
