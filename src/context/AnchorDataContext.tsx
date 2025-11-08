@@ -171,7 +171,6 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setCurrentProject(null);
             }
-        }
 
             // Load points and tests from localStorage (for now)
             const savedPoints = JSON.parse(localStorage.getItem('anchorViewPoints') || '[]');
