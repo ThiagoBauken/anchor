@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { AnchorPoint, AnchorTest, User, Project, AnchorTestResult, Location, MarkerShape, Company, UserRole } from '@/types';
+import { useDatabaseAuth } from '@/context/DatabaseAuthContext';
 // Server actions imported dynamically to avoid SSR issues
 
 
@@ -63,6 +64,9 @@ interface AnchorDataContextType {
 const AnchorDataContext = createContext<AnchorDataContextType | undefined>(undefined);
 
 export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
+  // Get authenticated user from DatabaseAuthContext
+  const { user: authUser, company: authCompany } = useDatabaseAuth();
+
   // DB state
   const [projects, setProjects] = useState<Project[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -96,11 +100,17 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     async function loadInitialData() {
         try {
-            // Try to get current user from localStorage first
-            const savedCurrentUser = JSON.parse(localStorage.getItem('anchorViewCurrentUser') || 'null');
+            // Use authenticated user from DatabaseAuthContext
+            // Fallback to localStorage only if not authenticated yet
+            const activeUser = authUser || JSON.parse(localStorage.getItem('anchorViewCurrentUser') || 'null');
+            const activeCompanyId = authCompany?.id || activeUser?.companyId;
 
-            // This is a placeholder for a real company ID system.
-            const activeCompanyId = savedCurrentUser?.companyId || 'clx3i4a7x000008l4hy822g62'; // Default company
+            // If no company ID, cannot load data
+            if (!activeCompanyId) {
+                console.warn('[AnchorDataContext] No company ID available, skipping data load');
+                setIsLoaded(true);
+                return;
+            }
 
             let dbUsers: any[] = [];
             let dbProjects: any[] = [];
@@ -134,16 +144,21 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
                 }
             }
 
-            // Se não há usuários no banco, tentar carregar do localStorage
-            if (dbUsers.length === 0) {
+            // Set currentUser: prefer authUser, then from dbUsers matching activeUser
+            if (authUser) {
+                // Use authenticated user from DatabaseAuthContext
+                setCurrentUser(authUser as any);
+                setUsers(dbUsers as any);
+            } else if (dbUsers.length === 0) {
+                // Fallback to localStorage if no users in DB
                 const localUsers = JSON.parse(localStorage.getItem('anchor-users') || '[]');
-                
+
                 if (localUsers.length > 0) {
                     setUsers(localUsers);
-                    const activeUser = localUsers.find((u: User) => u.id === savedCurrentUser?.id) || localUsers[0] || null;
-                    setCurrentUser(activeUser);
+                    const matchedUser = localUsers.find((u: User) => u.id === activeUser?.id) || localUsers[0] || null;
+                    setCurrentUser(matchedUser);
                 } else {
-                    // Criar usuário admin padrão apenas se não há nada
+                    // Create default admin user only if nothing exists
                     const defaultUser = {
                         id: 'default-admin',
                         name: 'Administrador',
@@ -157,8 +172,10 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
                     localStorage.setItem('anchor-users', JSON.stringify([defaultUser]));
                 }
             } else {
-                const activeUser = (dbUsers as any).find((u: any) => u.id === savedCurrentUser?.id) || dbUsers[0] || null;
-                setCurrentUser(activeUser as any);
+                // Use user from DB that matches activeUser
+                setUsers(dbUsers as any);
+                const matchedUser = (dbUsers as any).find((u: any) => u.id === activeUser?.id) || dbUsers[0] || null;
+                setCurrentUser(matchedUser as any);
             }
             
             const savedCurrentProject = JSON.parse(localStorage.getItem('anchorViewCurrentProject') || 'null');
@@ -197,7 +214,7 @@ export const AnchorDataProvider = ({ children }: { children: ReactNode }) => {
         console.error("Failed to load initial data", e);
         setSyncStatus('error');
     });
-  }, []);
+  }, [authUser, authCompany]); // Re-run when authentication changes
 
   // Sync state to localStorage
   useEffect(() => {
