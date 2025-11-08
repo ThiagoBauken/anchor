@@ -300,6 +300,7 @@ export function MapTab({ onActiveFloorPlanChange }: { onActiveFloorPlanChange?: 
         </div>
 
         <InteractiveMap
+          key={currentFloorPlan?.id || 'no-floor-plan'}
           points={filteredPoints}
           searchQuery={searchQuery}
           floorPlanImage={currentFloorPlan?.image || ''}
