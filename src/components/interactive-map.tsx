@@ -84,9 +84,9 @@ export function InteractiveMap({
     mapDimensions: { width: number; height: number; };
     showArchived?: boolean;
 }) {
-  const { 
-    inspectionFlags, allPointsForProject, currentUser, 
-    lineToolMode, setLineToolStartPoint, setLineToolEndPoint, 
+  const {
+    inspectionFlags, allPointsForProject, currentUser, currentProject,
+    lineToolMode, setLineToolStartPoint, setLineToolEndPoint,
     lineToolStartPointId, lineToolEndPointId, getPointById,
     lineToolPreviewPoints, locations
   } = useOfflineData();
