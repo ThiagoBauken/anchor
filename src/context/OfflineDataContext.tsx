@@ -173,6 +173,9 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (currentFloorPlan) {
       localStorage.setItem('anchorViewCurrentFloorPlan', JSON.stringify(currentFloorPlan))
+    } else {
+      // Clear localStorage when no floor plan selected (e.g., "Todas as plantas" or deleted)
+      localStorage.removeItem('anchorViewCurrentFloorPlan')
     }
   }, [currentFloorPlan])
 
