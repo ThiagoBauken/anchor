@@ -16,7 +16,6 @@ import {
   Upload,
   Download
 } from 'lucide-react'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
 import { syncManager } from '@/lib/sync-manager'
 import { offlineDB } from '@/lib/indexeddb'
 
@@ -27,7 +26,7 @@ interface OfflineStatusProps {
 
 export function OfflineStatus({ className = '', compact = false }: OfflineStatusProps) {
   const router = useRouter()
-  const { isOnline, syncStatus, lastSync, syncNow } = useOfflineAuthSafe()
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [stats, setStats] = useState({
     pending: 0,
     syncing: 0,
@@ -36,6 +35,22 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
   })
   const [dbStats, setDbStats] = useState<Record<string, number>>({})
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
+  const [lastSync, setLastSync] = useState<string | null>(null)
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // Update stats periodically
   useEffect(() => {
@@ -43,9 +58,13 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
       try {
         const syncStats = await syncManager.getSyncStats()
         setStats(syncStats)
-        
+
         const dbStats = await offlineDB.getStats()
         setDbStats(dbStats)
+
+        // Update last sync time
+        const lastSyncTime = localStorage.getItem('lastSyncTime')
+        setLastSync(lastSyncTime)
       } catch (error) {
         console.error('Failed to get stats:', error)
       }
@@ -59,10 +78,16 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
+    setSyncStatus('syncing')
     try {
-      await syncNow()
+      await syncManager.syncNow()
+      setSyncStatus('idle')
+      const now = new Date().toISOString()
+      setLastSync(now)
+      localStorage.setItem('lastSyncTime', now)
     } catch (error) {
       console.error('Manual sync failed:', error)
+      setSyncStatus('error')
     } finally {
       setIsRefreshing(false)
     }
@@ -72,12 +97,11 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
     switch (syncStatus) {
       case 'syncing':
         return <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-      case 'synced':
-        return <CheckCircle className="w-4 h-4 text-green-500" />
-      case 'failed':
+      case 'error':
         return <AlertCircle className="w-4 h-4 text-red-500" />
+      case 'idle':
       default:
-        return <Clock className="w-4 h-4 text-gray-500" />
+        return lastSync ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Clock className="w-4 h-4 text-gray-500" />
     }
   }
 
@@ -85,12 +109,11 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
     switch (syncStatus) {
       case 'syncing':
         return 'Sincronizando...'
-      case 'synced':
-        return 'Sincronizado'
-      case 'failed':
+      case 'error':
         return 'Erro na sincronização'
+      case 'idle':
       default:
-        return 'Aguardando'
+        return lastSync ? 'Sincronizado' : 'Aguardando'
     }
   }
 
@@ -180,7 +203,7 @@ export function OfflineStatus({ className = '', compact = false }: OfflineStatus
               <div className="text-sm font-medium">{getSyncStatusText()}</div>
               {lastSync && (
                 <div className="text-xs text-gray-500">
-                  Última: {lastSync.toLocaleTimeString()}
+                  Última: {new Date(lastSync).toLocaleTimeString()}
                 </div>
               )}
             </div>

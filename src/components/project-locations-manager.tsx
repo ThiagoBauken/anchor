@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useOfflineData } from '@/context/OfflineDataContext';
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext';
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,7 @@ const MARKER_SHAPES: { value: MarkerShape; label: string; icon: React.ReactNode 
 
 export function ProjectLocationsManager({ projectId, projectName }: ProjectLocationsManagerProps) {
     const { locations, createLocation, updateLocation, deleteLocation, points } = useOfflineData();
-    const { currentUser } = useOfflineAuthSafe();
+    const { user: currentUser } = useDatabaseAuthSafe();
     const { toast } = useToast();
     
     // Estados do formulário

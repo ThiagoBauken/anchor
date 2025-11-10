@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import type { Company } from '@/types'
 
 interface TrialInfo {
@@ -13,7 +13,7 @@ interface TrialInfo {
 }
 
 export function useTrial(): TrialInfo {
-  const { currentCompany } = useOfflineAuthSafe()
+  const { company: currentCompany } = useDatabaseAuthSafe()
   const [trialInfo, setTrialInfo] = useState<TrialInfo>({
     isTrialActive: false,
     daysRemaining: 0,

@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useTrial } from '@/hooks/use-trial'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, CreditCard, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
 function TrialExpiredContent() {
-  const { currentCompany, logout } = useOfflineAuthSafe()
+  const { company: currentCompany, logout } = useDatabaseAuthSafe()
   const { isExpired, canUseApp } = useTrial()
 
   // Don't show overlay if user can use app or has paid subscription

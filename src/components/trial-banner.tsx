@@ -1,14 +1,14 @@
 "use client";
 
 import { useTrial } from '@/hooks/use-trial'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Clock, CreditCard, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export function TrialBanner() {
-  const { currentCompany } = useOfflineAuthSafe()
+  const { company: currentCompany } = useDatabaseAuthSafe()
   const { isTrialActive, daysRemaining, hoursRemaining, minutesRemaining, isExpired, canUseApp } = useTrial()
 
   // Don't show banner if user has paid subscription

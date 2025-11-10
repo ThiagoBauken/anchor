@@ -4,20 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useRouter } from 'next/navigation'
 import { registerUser, loginUser, logoutUser, getCurrentUser } from '@/app/actions/auth'
 import { useToast } from '@/hooks/use-toast'
-
-interface User {
-  id: string
-  email: string
-  name: string
-  role: string
-  companyId: string
-}
-
-interface Company {
-  id: string
-  name: string
-  subscriptionPlan: string
-}
+import type { User, Company } from '@/types'
 
 interface DatabaseAuthContextType {
   user: User | null
@@ -54,13 +41,7 @@ export function DatabaseAuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await getCurrentUser()
 
       if (currentUser) {
-        setUser({
-          id: currentUser.id,
-          email: currentUser.email,
-          name: currentUser.name,
-          role: currentUser.role,
-          companyId: currentUser.companyId
-        })
+        setUser(currentUser as User)
         setCompany(currentUser.company)
       } else {
         setUser(null)
@@ -85,7 +66,7 @@ export function DatabaseAuthProvider({ children }: { children: ReactNode }) {
       const result = await loginUser(email, password)
       
       if (result.success && result.user) {
-        setUser(result.user)
+        setUser(result.user as User)
         setCompany(result.company)
         
         // Store in sessionStorage for PWA offline fallback
@@ -112,7 +93,7 @@ export function DatabaseAuthProvider({ children }: { children: ReactNode }) {
       const result = await registerUser(data)
       
       if (result.success && result.user) {
-        setUser(result.user)
+        setUser(result.user as User)
         setCompany(result.company)
         
         // Store in sessionStorage for PWA offline fallback

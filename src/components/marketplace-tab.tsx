@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Building2, Phone, Mail, MapPin, Users, Calendar, Shield, FileText, ExternalLink, Send, AlertCircle } from 'lucide-react'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { useOfflineData } from '@/context/OfflineDataContext'
 import { getClimbingCompanies } from '@/app/actions/marketplace-actions'
 import { inviteCompanyToProject } from '@/app/actions/invitation-actions'
@@ -54,7 +54,7 @@ interface ClimbingCompany {
 }
 
 export function MarketplaceTab() {
-  const { currentUser } = useOfflineAuthSafe()
+  const { user: currentUser } = useDatabaseAuthSafe()
   const { projects } = useOfflineData()
   const { toast } = useToast()
   const [companies, setCompanies] = useState<ClimbingCompany[]>([])

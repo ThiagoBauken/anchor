@@ -2,22 +2,22 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { currentUser, isAuthenticated, isLoading } = useOfflineAuthSafe()
+  const { user, isAuthenticated, isLoading } = useDatabaseAuthSafe()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && currentUser?.role !== 'superadmin') {
+    if (!isLoading && isAuthenticated && user?.role !== 'superadmin') {
       // Redirect non-superadmin users
       router.push('/')
     }
-  }, [isAuthenticated, currentUser, isLoading, router])
+  }, [isAuthenticated, user, isLoading, router])
 
   if (isLoading) {
     return (
@@ -27,7 +27,7 @@ export default function AdminLayout({
     )
   }
 
-  if (!isAuthenticated || currentUser?.role !== 'superadmin') {
+  if (!isAuthenticated || user?.role !== 'superadmin') {
     return null // Will redirect via useEffect
   }
 

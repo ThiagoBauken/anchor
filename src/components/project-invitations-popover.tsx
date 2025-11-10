@@ -6,7 +6,7 @@ import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { getProjectInvitations, acceptProjectInvitation, rejectProjectInvitation } from '@/app/actions/invitation-actions'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
@@ -27,7 +27,7 @@ interface ProjectInvitation {
 }
 
 export function ProjectInvitationsPopover() {
-  const { currentUser } = useOfflineAuthSafe()
+  const { user: currentUser } = useDatabaseAuthSafe()
   const { toast } = useToast()
   const router = useRouter()
   const [invitations, setInvitations] = useState<ProjectInvitation[]>([])

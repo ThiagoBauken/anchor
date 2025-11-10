@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { Button } from '@/components/ui/button'
 import { offlineDB } from '@/lib/indexeddb'
 import type { Company } from '@/types'
 
 export function DebugTrialFix() {
-  const { currentCompany, logout } = useOfflineAuthSafe()
+  const { company: currentCompany, logout } = useDatabaseAuthSafe()
   const [isFixing, setIsFixing] = useState(false)
   const [result, setResult] = useState<string>('')
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useOfflineAuthSafe } from '@/context/OfflineAuthContext'
+import { useDatabaseAuthSafe } from '@/context/DatabaseAuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -37,7 +37,7 @@ import {
 import type { SystemStats, AdminActivity, Company, User, SubscriptionPlan } from '@/types'
 
 export default function AdminDashboard() {
-  const { currentUser, isAuthenticated } = useOfflineAuthSafe()
+  const { user: currentUser, isAuthenticated } = useDatabaseAuthSafe()
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [companies, setCompanies] = useState<Company[]>([])
   const [users, setUsers] = useState<User[]>([])
