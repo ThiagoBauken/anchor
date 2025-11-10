@@ -8,23 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UserPlus, User, ShieldCheck, Trash2, Send, Copy, ExternalLink, Clock, CheckCircle, XCircle, KeyRound } from 'lucide-react';
+import { UserPlus, Send, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { UserCard } from './user-card';
+import { InvitationCard } from './invitation-card';
 
 interface Invitation {
   id: string;
@@ -191,18 +181,6 @@ export function UsersTab() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Pendente</Badge>;
-      case 'accepted':
-        return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />Aceito</Badge>;
-      case 'expired':
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Expirado</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -340,74 +318,17 @@ export function UsersTab() {
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {users.length > 0 ? (
                     users.map((user) => (
-                      <div
+                      <UserCard
                         key={user.id}
-                        className={`flex items-center justify-between p-3 rounded-md transition-colors group`}
-                      >
-                        <div className="flex items-center gap-3 flex-grow">
-                          {user.role === 'superadmin' || user.role === 'company_admin' ? <ShieldCheck className="h-5 w-5 text-accent" /> : <User className="h-5 w-5 text-primary" />}
-                          <span className={`font-medium transition-colors ${currentUser?.id === user.id ? 'text-primary' : ''}`}>{user.name}</span>
-                          <span className="text-xs text-muted-foreground">({user.role})</span>
-                          {currentUser?.id === user.id && <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">Atual</span>}
-                        </div>
-                        
-                        {currentUser?.id === user.id && (
-                          <div className="text-xs font-semibold text-primary py-1 px-2.5 rounded-full bg-primary/10 mr-2">
-                            ATIVO
-                          </div>
-                        )}
-
-                        {(currentUser?.role === 'company_admin' || currentUser?.role === 'superadmin') && currentUser?.id !== user.id && (
-                          <div className="flex items-center gap-1">
-                            {/* Reset Password Button */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" title="Resetar Senha">
-                                  <KeyRound className="h-4 w-4 text-blue-600"/>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Resetar Senha do Usuário</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Será gerado um link de recuperação para <strong>{user.name}</strong>.
-                                    <br/><br/>
-                                    O link será enviado por email e também copiado para sua área de transferência.
-                                    O link expira em 24 horas.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleResetPassword(user.id, user.name)}>
-                                    Gerar Link
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-
-                            {/* Delete User Button */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" title="Excluir Usuário">
-                                  <Trash2 className="h-4 w-4 text-destructive"/>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o usuário.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Continuar</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        )}
-                      </div>
+                        user={user}
+                        isCurrentUser={currentUser?.id === user.id}
+                        canManage={
+                          (currentUser?.role === 'company_admin' || currentUser?.role === 'superadmin') &&
+                          currentUser?.id !== user.id
+                        }
+                        onDelete={handleDeleteUser}
+                        onResetPassword={handleResetPassword}
+                      />
                     ))
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-4">
@@ -511,47 +432,11 @@ export function UsersTab() {
                   ) : invitations.length > 0 ? (
                     <div className="space-y-4">
                       {invitations.map((invitation) => (
-                        <div key={invitation.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{invitation.description || `Convite para ${invitation.role === 'company_admin' || invitation.role === 'superadmin' ? 'administrador' : invitation.role === 'team_admin' ? 'admin de equipe' : 'técnico'}`}</span>
-                              {getStatusBadge(invitation.status)}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              <span>Permissão: {invitation.role === 'superadmin' ? 'Super Admin' : invitation.role === 'company_admin' ? 'Admin da Empresa' : invitation.role === 'team_admin' ? 'Admin de Equipe' : 'Técnico'}</span>
-                              <span className="mx-2">•</span>
-                              <span>Enviado por: {invitation.invited_by}</span>
-                              <span className="mx-2">•</span>
-                              <span>Expira: {new Date(invitation.expires_at).toLocaleDateString('pt-BR')}</span>
-                              {invitation.max_uses && (
-                                <>
-                                  <span className="mx-2">•</span>
-                                  <span>Usos: {invitation.current_uses || 0}/{invitation.max_uses}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {invitation.status === 'pending' && invitation.invite_url && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => copyInviteUrl(invitation.invite_url!)}
-                              >
-                                <Copy className="h-4 w-4 mr-1" />
-                                Copiar Link
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(invitation.invite_url, '_blank')}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                        <InvitationCard
+                          key={invitation.id}
+                          invitation={invitation}
+                          onCopyUrl={copyInviteUrl}
+                        />
                       ))}
                     </div>
                   ) : (
