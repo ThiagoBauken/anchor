@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useAnchorData } from '@/context/AnchorDataContext';
+import { useOfflineData } from '@/context/OfflineDataContext';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
 import { Bell, AlertCircle } from 'lucide-react';
@@ -10,7 +10,7 @@ import { PointDetailsModal } from './point-details-modal';
 import { ScrollArea } from './ui/scroll-area';
 
 export function InspectionRemindersPopover() {
-    const { inspectionFlags, getPointById, points } = useAnchorData();
+    const { inspectionFlags, getPointById, points } = useOfflineData();
     const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
 
     const flaggedPoints = inspectionFlags

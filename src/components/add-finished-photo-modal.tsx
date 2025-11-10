@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
-import { useAnchorData } from '@/context/AnchorDataContext';
+import { useOfflineData } from '@/context/OfflineDataContext';
 import { useToast } from '@/hooks/use-toast';
 import { CameraCapture } from './camera-capture';
 
@@ -16,7 +16,7 @@ interface AddFinishedPhotoModalProps {
 
 export function AddFinishedPhotoModal({ isOpen, onClose, testId, pointNumber }: AddFinishedPhotoModalProps) {
   const [photo, setPhoto] = useState<string | null>(null);
-  const { addFinishedPhotoToTest } = useAnchorData();
+  const { addFinishedPhotoToTest } = useOfflineData();
   const { toast } = useToast();
 
   const handleSave = () => {

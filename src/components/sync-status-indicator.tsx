@@ -1,13 +1,26 @@
 
 "use client";
 
-import { useAnchorData } from "@/context/AnchorDataContext";
+import { useState, useEffect } from "react";
 import { Cloud, CheckCircle, AlertCircle, Loader } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 export function SyncStatusIndicator() {
-  const { syncStatus } = useAnchorData();
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    // Monitor localStorage changes for sync status
+    const checkSyncStatus = () => {
+      const status = localStorage.getItem('syncStatus') as 'idle' | 'saving' | 'saved' | 'error' || 'idle';
+      setSyncStatus(status);
+    };
+
+    checkSyncStatus();
+    const interval = setInterval(checkSyncStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const getStatusInfo = () => {
     switch (syncStatus) {

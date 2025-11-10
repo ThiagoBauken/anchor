@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { SessionProvider } from 'next-auth/react'
 import { DatabaseAuthProvider } from '@/context/DatabaseAuthContext'
 import { OfflineDataProvider } from '@/context/OfflineDataContext'
-import { AnchorDataProvider } from '@/context/AnchorDataContext'
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false)
@@ -22,9 +21,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <DatabaseAuthProvider>
         <OfflineDataProvider>
-          <AnchorDataProvider>
-            {children}
-          </AnchorDataProvider>
+          {children}
         </OfflineDataProvider>
       </DatabaseAuthProvider>
     </SessionProvider>

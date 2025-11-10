@@ -4,7 +4,7 @@
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAnchorData } from "@/context/AnchorDataContext";
+import { useOfflineData } from "@/context/OfflineDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,7 +68,7 @@ export function EditPointAndTestForm({ pointToEdit, onFormSubmit }: EditPointAnd
       locations,
       getTestsByPointId,
       currentUser
-  } = useAnchorData();
+  } = useOfflineData();
   const { toast } = useToast();
 
   const latestTest = useMemo(() => getTestsByPointId(pointToEdit.id)[0], [getTestsByPointId, pointToEdit.id]);

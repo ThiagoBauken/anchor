@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import React, { useState } from 'react';
-import { useAnchorData } from '@/context/AnchorDataContext';
+import { useOfflineData } from '@/context/OfflineDataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Building2, UserCheck, FileText, Settings, Globe, Shield } from 'lucide-react';
 
 export default function ConfiguracoesPage() {
-  const { currentUser } = useAnchorData();
+  const { currentUser } = useOfflineData();
   const { toast } = useToast();
   
   // Estado para as configurações da empresa

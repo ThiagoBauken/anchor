@@ -76,6 +76,9 @@ interface OfflineDataContextType {
   
   createTest: (test: Omit<AnchorTest, 'id' | 'dataHora'>) => Promise<AnchorTest>
   updatePointsAndAddTest: (pontoId: string, testData: Omit<AnchorTestResult, 'id' | 'dataHora' | 'pontoId' | 'createdByUserId'>, pointUpdates: Partial<AnchorPoint>) => void
+  updatePointAndAddOrUpdateTest: (pointId: string, pointData: Partial<AnchorPoint>, testData?: Omit<AnchorTestResult, 'id' | 'dataHora' | 'pontoId' | 'createdByUserId'>) => void
+  addFinishedPhotoToTest: (testId: string, photoDataUrl: string) => void
+  getTestsByPointId: (pointId: string) => AnchorTest[]
   
   // Getters
   getProjectById: (id: string) => Project | null
@@ -1029,6 +1032,32 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     console.log('✅ Test created and point updated:', test.resultado)
   }
 
+  const addFinishedPhotoToTest = useCallback((testId: string, photoDataUrl: string) => {
+    setTests(prevTests => prevTests.map(t =>
+      t.id === testId
+        ? { ...t, fotoPronto: photoDataUrl, dataFotoPronto: new Date().toISOString() }
+        : t
+    ))
+  }, [])
+
+  const updatePointAndAddOrUpdateTest = async (
+    pointId: string,
+    pointData: Partial<AnchorPoint>,
+    testData?: Omit<AnchorTestResult, 'id' | 'dataHora' | 'pontoId' | 'createdByUserId'>
+  ) => {
+    // Update point
+    const point = points.find(p => p.id === pointId)
+    if (point) {
+      const updatedPoint = { ...point, ...pointData }
+      await updatePoint(updatedPoint)
+    }
+
+    // Add test if testData provided
+    if (testData) {
+      await updatePointsAndAddTest(pointId, testData, pointData)
+    }
+  }
+
   // Getter methods
   const getProjectById = (id: string): Project | null => {
     return projects.find(p => p.id === id) || null
@@ -1054,6 +1083,9 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     return tests.filter(t => t.pontoId === pointId)
       .sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime())
   }
+
+  // Alias for compatibility
+  const getTestsByPointId = getTestsByPoint
 
   const getPointById = (id: string): AnchorPoint | null => {
     return points.find(p => p.id === id) || null
@@ -1131,7 +1163,9 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     addMultiplePoints,
     createTest,
     updatePointsAndAddTest,
-    
+    updatePointAndAddOrUpdateTest,
+    addFinishedPhotoToTest,
+
     // Getters
     getProjectById,
     getUsersForCompany,
@@ -1139,6 +1173,7 @@ export function OfflineDataProvider({ children }: { children: ReactNode }) {
     getLocationsForCompany,
     getPointsByProject,
     getTestsByPoint,
+    getTestsByPointId,
     getPointById,
     
     // UI state
